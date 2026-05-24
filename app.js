@@ -1806,6 +1806,7 @@ class GameEngine {
 
                 // Show setup remote panel
                 document.getElementById('setup-remote-lobby').classList.remove('hide');
+                document.getElementById('setup-copy-link-btn').classList.remove('hide');
 
                 // Swap Left Setup Card title and show players lobby list
                 document.getElementById('setup-left-title').innerText = "CÁC NGƯỜI CHƠI ĐÃ THAM GIA";
@@ -1856,8 +1857,9 @@ class GameEngine {
                 document.getElementById('add-team-btn').classList.remove('hide');
                 document.getElementById('setup-players-lobby').classList.add('hide');
 
-                // Hide setup remote panel
+                // Hide setup remote panel & copy link button
                 document.getElementById('setup-remote-lobby').classList.add('hide');
+                document.getElementById('setup-copy-link-btn').classList.add('hide');
 
                 // Restore standard offline team configurations
                 this.renderSetupTeams();
@@ -1866,6 +1868,25 @@ class GameEngine {
 
         document.getElementById('start-game-btn').addEventListener('click', () => {
             this.startGame();
+        });
+
+        // Copy Room Link Button click handler
+        document.getElementById('setup-copy-link-btn').addEventListener('click', () => {
+            const roomUrl = document.getElementById('setup-url-display').innerText;
+            if (roomUrl && roomUrl !== '-') {
+                navigator.clipboard.writeText(roomUrl).then(() => {
+                    const btn = document.getElementById('setup-copy-link-btn');
+                    const originalText = btn.querySelector('.btn-text').innerText;
+                    btn.querySelector('.btn-text').innerText = "ĐÃ SAO CHÉP LIÊN KẾT!";
+                    AudioPlayer.playClick();
+                    setTimeout(() => {
+                        btn.querySelector('.btn-text').innerText = originalText;
+                    }, 2000);
+                }).catch(err => {
+                    console.error("Failed to copy link:", err);
+                    alert("Không thể tự động sao chép! Bạn hãy copy thủ công link ở ô phía trên.");
+                });
+            }
         });
 
         document.getElementById('confirm-answer-btn').addEventListener('click', () => {
