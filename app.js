@@ -1687,10 +1687,15 @@ class GameEngine {
         });
 
         document.getElementById('confirm-answer-btn').addEventListener('click', () => {
+            if (this.isMultiDevice) return;
             this.confirmAnswer();
         });
 
         document.getElementById('next-turn-btn').addEventListener('click', () => {
+            if (this.isMultiDevice) {
+                this.handleBattleRoyaleNextStep();
+                return;
+            }
             this.nextTurn();
             AudioPlayer.playClick();
         });
@@ -2181,9 +2186,6 @@ class GameEngine {
         const nextBtn = document.getElementById('next-turn-btn');
         nextBtn.classList.remove('hide');
         nextBtn.innerHTML = "Xem Giải Thích / Tiếp Tục";
-        nextBtn.onclick = () => {
-            this.revealBattleRoyaleExplanation();
-        };
 
         this.renderArenaTeams();
 
@@ -2252,7 +2254,13 @@ class GameEngine {
         
         const nextBtn = document.getElementById('next-turn-btn');
         nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
-        nextBtn.onclick = () => {
+    }
+
+    handleBattleRoyaleNextStep() {
+        AudioPlayer.playClick();
+        if (!this.answerConfirmed) {
+            this.revealBattleRoyaleExplanation();
+        } else {
             document.getElementById('explanation-modal').classList.remove('active');
             this.activeQuestionIdx++;
             
@@ -2261,7 +2269,7 @@ class GameEngine {
             } else {
                 this.nextBattleRoyaleQuestion();
             }
-        };
+        }
     }
 
     logBattleRoyale(msg) {
