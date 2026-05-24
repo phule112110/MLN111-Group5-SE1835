@@ -1405,3 +1405,188 @@ header::before {
     padding: 2px 5px;
 }
 
+/* ==========================================================================
+   RESPONSIVE DESIGN & MEDIA QUERIES (FOR ALL DEV/MOBILE DEVICES)
+   ========================================================================== */
+
+/* Tablet & Smaller Desktops (Under 1024px) */
+@media (max-width: 1024px) {
+    #app-container {
+        padding: 10px;
+        gap: 15px;
+    }
+    
+    header {
+        padding: 12px 20px;
+    }
+    
+    .game-grid {
+        grid-template-columns: 1.5fr 1fr;
+        gap: 15px;
+    }
+}
+
+/* Tablets & Mobile Landscape (Under 768px) */
+@media (max-width: 768px) {
+    header {
+        flex-direction: column;
+        gap: 10px;
+        text-align: center;
+        padding: 15px 10px;
+    }
+    
+    .header-subtitle {
+        font-size: 11px;
+    }
+    
+    .setup-grid {
+        grid-template-columns: 1fr; /* Stack Left and Right cards */
+        gap: 15px;
+    }
+    
+    .game-grid {
+        grid-template-columns: 1fr; /* Stack Quiz and Logs card */
+        gap: 15px;
+    }
+    
+    .setup-card {
+        padding: 20px;
+    }
+    
+    .modal-box {
+        width: 95%;
+        padding: 15px;
+        max-height: 95vh;
+    }
+    
+    .import-export-panel {
+        grid-template-columns: 1fr !important; /* Stack import/export buttons */
+        gap: 10px !important;
+    }
+    
+    .options-input-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .flex-row {
+        grid-template-columns: 1fr;
+    }
+    
+    .winner-headline {
+        font-size: 22px;
+    }
+    
+    .winner-hero-card {
+        padding: 15px 25px;
+    }
+}
+
+/* Mobile Phones (Under 600px) */
+@media (max-width: 600px) {
+    .options-grid {
+        grid-template-columns: 1fr; /* Vertically stack answers */
+        gap: 10px;
+    }
+    
+    .option-btn {
+        padding: 12px 15px;
+    }
+    
+    .option-letter {
+        width: 28px;
+        height: 28px;
+        border-radius: 6px;
+        font-size: 13px;
+    }
+    
+    .option-value {
+        font-size: 13px;
+    }
+    
+    .question-container {
+        padding: 15px;
+        min-height: 100px;
+    }
+    
+    .question-text-content {
+        font-size: 14px;
+        line-height: 1.5;
+    }
+    
+    .quiz-actions {
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+    }
+    
+    .quiz-actions .action-btn {
+        width: 100%;
+        text-align: center;
+        padding: 12px;
+        font-size: 12px;
+    }
+    
+    /* Optimize client view for narrow mobile screens */
+    #client-container {
+        margin: 10px auto;
+        padding: 15px;
+        max-width: 96%;
+        border-radius: 12px;
+        box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+    
+    #client-container header {
+        padding-bottom: 10px;
+    }
+    
+    #client-question-text {
+        font-size: 13px;
+        padding: 10px;
+    }
+    
+    /* Compact player grid scrolling on small screens */
+    .arena-section {
+        padding: 12px;
+    }
+    
+    .teams-grid.compact {
+        grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+        gap: 8px;
+    }
+    
+    .teams-grid.compact .team-card {
+        padding: 8px;
+        min-height: 80px;
+    }
+    
+    .teams-grid.compact .team-card .team-card-header h4 {
+        font-size: 11px;
+        max-width: 75px;
+    }
+    
+    .team-input-row {
+        grid-template-columns: auto 1fr;
+        row-gap: 8px;
+        column-gap: 10px;
+    }
+    
+    .team-input-row input[type="text"] {
+        width: 100%;
+    }
+    
+    .team-input-row .color-picker-box {
+        grid-column: 1 / span 2;
+        justify-content: center;
+        flex-wrap: wrap;
+    }
+    
+    .team-input-row .remove-team-btn {
+        grid-column: 1 / span 2;
+        justify-content: center;
+        background: rgba(239, 68, 68, 0.05);
+        border: 1px solid rgba(239, 68, 68, 0.1);
+        width: 100%;
+        padding: 6px;
+    }
+}
+
