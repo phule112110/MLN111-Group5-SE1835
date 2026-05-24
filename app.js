@@ -1,11 +1,12 @@
 const FIREBASE_CONFIG = {
-    apiKey: "AIzaSyDF-open-sandbox-key-for-classtruggle",
-    authDomain: "classtruggle-arena-default.firebaseapp.com",
-    databaseURL: "https://classtruggle-arena-default-rtdb.asia-southeast1.firebasedatabase.app/",
-    projectId: "classtruggle-arena-default",
-    storageBucket: "classtruggle-arena-default.appspot.com",
-    messagingSenderId: "9988776655",
-    appId: "1:9988776655:web:123456789abc"
+    apiKey: "AIzaSyBSfHz4UmCwEdw3ema6rEZKGjeaSkzol00",
+    authDomain: "classtruggle-arena.firebaseapp.com",
+    databaseURL: "https://classtruggle-arena-default-rtdb.asia-southeast1.firebasedatabase.app",
+    projectId: "classtruggle-arena",
+    storageBucket: "classtruggle-arena.firebasestorage.app",
+    messagingSenderId: "450580113626",
+    appId: "1:450580113626:web:17941c5c8443257b681de3",
+    measurementId: "G-WTMCQGW8RQ"
 };
 
 try {
