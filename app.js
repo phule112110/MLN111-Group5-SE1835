@@ -1984,20 +1984,10 @@ class GameEngine {
         // Initial Room state
         this.firebaseRef.set({
             state: 'lobby',
-            activeTeam: '',
-            teams: this.teams.map(t => ({
-                id: t.id,
-                name: t.name,
-                hp: t.hp,
-                maxHp: t.maxHp,
-                points: t.points,
-                rankIndex: t.rankIndex,
-                isEliminated: t.isEliminated,
-                color: t.color
-            })),
-            currentQuestion: null,
-            selectedAnswers: {},
-            attackTarget: null
+            currentQuestionIdx: 0,
+            questionActive: false,
+            players: {},
+            battleLogs: [`[HỆ THỐNG] Đấu trường sinh tồn 40 người chơi đã sẵn sàng!`]
         });
 
         // Set Lobby Screen active
@@ -2023,61 +2013,117 @@ class GameEngine {
         }
 
         // Render Connected list placeholder
-        this.renderLobbyTeams([]);
+        this.renderLobbyPlayers();
 
-        // Listen for connections
-        this.firebaseRef.child('connectedClients').on('value', (snapshot) => {
-            const connections = snapshot.val() || {};
-            const connectedTeamNames = Object.keys(connections);
-            this.renderLobbyTeams(connectedTeamNames);
-            
-            // Play a soft chime sound on player join!
-            AudioPlayer.playClick();
+        // Listen for player connections
+        this.firebaseRef.child('players').on('value', (snapshot) => {
+            const playersData = snapshot.val() || {};
+            // Convert playersData dictionary to this.teams array
+            this.teams = Object.keys(playersData).map((name, idx) => {
+                const p = playersData[name];
+                return {
+                    id: p.id !== undefined ? p.id : idx,
+                    name: p.name,
+                    hp: p.hp,
+                    maxHp: p.maxHp,
+                    points: p.points,
+                    rankIndex: p.rankIndex,
+                    isEliminated: p.isEliminated,
+                    color: p.color
+                };
+            });
+
+            this.renderLobbyPlayers();
+            AudioPlayer.playClick(); // Play a chime on join
         });
 
         // Bind lobby start button
         document.getElementById('lobby-start-btn').onclick = () => {
-            // Unbind lobby listener
-            this.firebaseRef.child('connectedClients').off();
+            if (this.teams.length < 2) {
+                alert("Đấu trường sinh tồn cần tối thiểu 2 đấu sĩ để bắt đầu!");
+                return;
+            }
             
-            // Start regular quiz screen
+            // Unbind lobby players listener
+            this.firebaseRef.child('players').off();
+            
+            // Apply compact layout to the arena grid to comfortably support up to 40 players!
+            document.getElementById('teams-grid').classList.add('compact');
+            
+            // Set game screen active
             document.getElementById('lobby-screen').classList.remove('active');
             document.getElementById('game-screen').classList.add('active');
             
+            // Listen for continuous updates of players during gameplay
+            this.firebaseRef.child('players').on('value', (snapshot) => {
+                const playersData = snapshot.val() || {};
+                // Sync local teams
+                this.teams = this.teams.map(t => {
+                    const pd = playersData[t.name];
+                    if (pd) {
+                        t.hp = pd.hp;
+                        t.points = pd.points;
+                        t.rankIndex = pd.rankIndex;
+                        t.isEliminated = pd.isEliminated;
+                    }
+                    return t;
+                });
+                
+                this.renderArenaTeams();
+                
+                if (this.checkGameEnded()) {
+                    this.endGame();
+                }
+            });
+
+            // Listen for battle logs
+            this.firebaseRef.child('battleLogs').on('value', (snapshot) => {
+                const logs = snapshot.val() || [];
+                const container = document.getElementById('battle-logs');
+                container.innerHTML = '';
+                logs.forEach(log => {
+                    const div = document.createElement('div');
+                    div.className = 'log-entry';
+                    div.innerText = log;
+                    if (log.includes('SAI') || log.includes('mất') || log.includes('đào thải')) div.className += ' incorrect';
+                    if (log.includes('ĐÚNG') || log.includes('thắng') || log.includes('TẤN CÔNG')) div.className += ' correct';
+                    container.appendChild(div);
+                });
+                container.scrollTop = container.scrollHeight;
+            });
+
             this.state = 'quiz';
-            this.logBattle(`[HỆ THỐNG] ĐẤU TRƯỜNG BIỆN CHỨNG KHỞI TRẠNH (MÃ PHÒNG: ${this.roomCode})!`);
-            this.teams.forEach(t => {
-                this.logBattle(`- [Gia nhập] Đội '${t.name}' đã đồng bộ thiết bị điều khiển thành công.`);
+            this.logBattleRoyale(`[HỆ THỐNG] ĐẤU TRƯỜNG SINH TỒN KHỞI CHẠY VỚI ${this.teams.length} ĐẤU SĨ!`);
+            
+            // Push room state as started
+            this.firebaseRef.update({
+                state: 'quiz',
+                currentQuestionIdx: 0,
+                questionActive: true
             });
 
             AudioPlayer.playLevelUp();
-            this.nextQuestion();
+            this.nextBattleRoyaleQuestion();
         };
     }
 
-    renderLobbyTeams(connectedTeamNames) {
+    renderLobbyPlayers() {
         const grid = document.getElementById('lobby-teams-grid');
         grid.innerHTML = '';
         
-        let connectedCount = 0;
         this.teams.forEach(t => {
-            const isConnected = connectedTeamNames.includes(t.name);
-            if (isConnected) connectedCount++;
-
             const card = document.createElement('div');
             card.className = 'team-card glass-panel';
-            card.style.borderColor = isConnected ? t.color : 'rgba(255,255,255,0.05)';
-            card.style.color = isConnected ? t.color : 'var(--text-muted)';
-            card.style.background = isConnected ? 'rgba(255,255,255,0.02)' : 'rgba(0,0,0,0.2)';
+            card.style.borderColor = t.color;
+            card.style.color = t.color;
+            card.style.background = 'rgba(255,255,255,0.02)';
             
             const currentRank = CLASS_RANKS[t.rankIndex];
 
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <strong style="font-size:14px; color:${isConnected ? '#fff' : 'var(--text-muted)'}">${t.name}</strong>
-                    <span style="font-size:10px; font-weight:bold; color:${isConnected ? 'hsl(var(--neon-green))' : 'var(--text-muted)'}">
-                        ${isConnected ? '● Đã kết nối' : '○ Chờ...'}
-                    </span>
+                    <strong style="font-size:14px; color:#fff">${t.name}</strong>
+                    <span style="font-size:10px; font-weight:bold; color:hsl(var(--neon-green))">● Đã kết nối</span>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                     <span style="font-size:11px; font-family:'Orbitron',sans-serif;">${currentRank.title}</span>
@@ -2089,15 +2135,148 @@ class GameEngine {
             grid.appendChild(card);
         });
 
-        document.getElementById('connected-count').innerText = connectedCount;
-        document.getElementById('lobby-total-teams').innerText = this.teams.length;
+        document.getElementById('connected-count').innerText = this.teams.length;
+        document.getElementById('lobby-total-teams').innerText = "40";
+    }
+
+    nextBattleRoyaleQuestion() {
+        this.answerConfirmed = false;
+        this.selectedOptionIdx = null;
+
+        if (this.activeQuestionIdx >= this.shuffledQuestions.length) {
+            this.endGame();
+            return;
+        }
+
+        const q = this.shuffledQuestions[this.activeQuestionIdx];
+
+        // Update Host UI question card
+        document.getElementById('current-round').innerText = this.activeQuestionIdx + 1;
+        document.getElementById('active-team-name').innerText = "T T C ĐẤU SĨ";
+        document.getElementById('active-team-name').style.backgroundColor = "var(--neon-cyan)";
+        document.getElementById('question-text').innerText = q.text;
+
+        const optContainer = document.getElementById('options-container');
+        optContainer.innerHTML = '';
+
+        q.options.forEach((opt, idx) => {
+            const letter = String.fromCharCode(65 + idx);
+            const btn = document.createElement('button');
+            btn.className = 'option-btn glass-panel';
+            btn.dataset.index = idx;
+            btn.innerHTML = `
+                <span class="option-letter">${letter}</span>
+                <span class="option-value">${opt}</span>
+            `;
+            btn.disabled = true;
+            optContainer.appendChild(btn);
+        });
+
+        document.getElementById('combat-instruction').classList.add('hidden');
+        document.getElementById('show-explanation-btn').classList.add('hide');
+        
+        const confirmBtn = document.getElementById('confirm-answer-btn');
+        confirmBtn.classList.add('hide');
+        
+        const nextBtn = document.getElementById('next-turn-btn');
+        nextBtn.classList.remove('hide');
+        nextBtn.innerHTML = "Xem Giải Thích / Tiếp Tục";
+        nextBtn.onclick = () => {
+            this.revealBattleRoyaleExplanation();
+        };
+
+        this.renderArenaTeams();
+
+        // Push current question data to Firebase
+        this.firebaseRef.update({
+            state: 'quiz',
+            currentQuestionIdx: this.activeQuestionIdx,
+            questionActive: true,
+            currentQuestion: {
+                text: q.text,
+                options: q.options
+            },
+            responses: {}
+        });
+
+        this.startBattleRoyaleTimer();
+    }
+
+    startBattleRoyaleTimer() {
+        if (this.timerInterval) clearInterval(this.timerInterval);
+
+        this.timeLeft = this.questionTime;
+        const timerBar = document.getElementById('timer-bar');
+        const timerText = document.getElementById('timer-text');
+
+        timerBar.style.width = '100%';
+        timerText.innerText = `${this.timeLeft}s`;
+
+        this.timerInterval = setInterval(() => {
+            this.timeLeft--;
+            timerText.innerText = `${this.timeLeft}s`;
+            timerBar.style.width = `${(this.timeLeft / this.questionTime) * 100}%`;
+
+            if (this.timeLeft <= 5 && this.timeLeft > 0) {
+                AudioPlayer.playTick();
+            }
+
+            if (this.timeLeft <= 0) {
+                clearInterval(this.timerInterval);
+                this.revealBattleRoyaleExplanation();
+            }
+        }, 1000);
+    }
+
+    revealBattleRoyaleExplanation() {
+        if (this.answerConfirmed) return;
+        clearInterval(this.timerInterval);
+        this.answerConfirmed = true;
+
+        const q = this.shuffledQuestions[this.activeQuestionIdx];
+        
+        const btns = document.querySelectorAll('#options-container .option-btn');
+        btns.forEach(btn => {
+            const btnIdx = parseInt(btn.dataset.index);
+            if (btnIdx === q.correct) {
+                btn.classList.add('correct');
+            }
+        });
+
+        this.firebaseRef.update({
+            questionActive: false
+        });
+
+        document.getElementById('explanation-content').innerText = q.explanation || "Luận điểm Mác - Lênin chuẩn xác.";
+        document.getElementById('explanation-modal').classList.add('active');
+        
+        const nextBtn = document.getElementById('next-turn-btn');
+        nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
+        nextBtn.onclick = () => {
+            document.getElementById('explanation-modal').classList.remove('active');
+            this.activeQuestionIdx++;
+            
+            if (this.activeQuestionIdx >= this.shuffledQuestions.length) {
+                this.endGame();
+            } else {
+                this.nextBattleRoyaleQuestion();
+            }
+        };
+    }
+
+    logBattleRoyale(msg) {
+        this.firebaseRef.child('battleLogs').once('value', (snapshot) => {
+            const logs = snapshot.val() || [];
+            logs.push(`[${new Date().toLocaleTimeString('vi-VN')}] ${msg}`);
+            if (logs.length > 50) logs.shift();
+            this.firebaseRef.child('battleLogs').set(logs);
+        });
     }
 
     initClientMode(roomCode) {
         this.roomCode = roomCode;
         this.isClient = true;
         
-        // Hide Main Game app container, show client container
         document.getElementById('app-container').style.display = 'none';
         document.getElementById('client-container').classList.remove('hidden');
         document.getElementById('client-room-display').innerText = roomCode;
@@ -2109,56 +2288,63 @@ class GameEngine {
 
         this.firebaseRef = firebase.database().ref('rooms/' + roomCode);
 
-        // Fetch team list from Firebase to populate selection dropdown
-        this.firebaseRef.child('teams').once('value', (snapshot) => {
-            const teams = snapshot.val();
-            if (!teams) {
-                alert("Mã phòng đấu không tồn tại hoặc đã bị đóng!");
-                window.location.href = window.location.pathname; // go back to main screen
+        // Bind Join Button
+        document.getElementById('client-join-btn').onclick = () => {
+            const rawName = document.getElementById('client-player-name').value.trim();
+            if (!rawName) {
+                alert("Vui lòng nhập tên của bạn!");
+                return;
+            }
+            if (rawName.length > 12) {
+                alert("Tên quá dài (tối đa 12 ký tự)!");
                 return;
             }
 
-            const select = document.getElementById('client-team-select');
-            select.innerHTML = '';
-            teams.forEach(t => {
-                const opt = document.createElement('option');
-                opt.value = t.name;
-                opt.innerText = t.name;
-                select.appendChild(opt);
-            });
-        });
-
-        // Bind Join Button
-        document.getElementById('client-join-btn').onclick = () => {
-            const teamName = document.getElementById('client-team-select').value;
-            if (!teamName) return;
-
+            const teamName = rawName;
             this.clientTeamName = teamName;
             
-            // Set client joined in database
-            firebase.database().ref(`rooms/${roomCode}/connectedClients/${teamName}`).set(true);
-
-            // Transition to client lobby view
-            document.getElementById('client-setup-view').classList.add('hidden');
-            document.getElementById('client-lobby-view').classList.remove('hidden');
-            document.getElementById('client-my-team-name').innerText = teamName;
-            
-            // Set avatar color & icon matching team
-            this.firebaseRef.child('teams').once('value', (snap) => {
-                const teams = snap.val() || [];
-                const myTeam = teams.find(t => t.name === teamName);
-                if (myTeam) {
-                    const myRank = getClassRank(myTeam.points).rank;
-                    const avatarBox = document.getElementById('client-lobby-avatar');
-                    avatarBox.style.color = myTeam.color;
-                    avatarBox.style.borderColor = myTeam.color;
-                    avatarBox.style.boxShadow = `0 0 15px ${myTeam.color}`;
-                    avatarBox.innerHTML = myRank.avatarSvg;
+            this.firebaseRef.child('players').once('value', (snapshot) => {
+                const players = snapshot.val() || {};
+                
+                if (players[teamName]) {
+                    alert("Tên này đã được sử dụng! Vui lòng chọn tên khác.");
+                    return;
                 }
-            });
+                
+                if (Object.keys(players).length >= 40) {
+                    alert("Phòng đấu đã đầy (tối đa 40 người)!");
+                    return;
+                }
+                
+                const color = this.colorPresets[Object.keys(players).length % this.colorPresets.length];
+                
+                const newPlayer = {
+                    id: Object.keys(players).length,
+                    name: teamName,
+                    hp: 100,
+                    maxHp: 100,
+                    points: 0,
+                    rankIndex: 0,
+                    isEliminated: false,
+                    color: color
+                };
+                
+                this.firebaseRef.child('players').child(teamName).set(newPlayer);
+                this.firebaseRef.child('connectedClients').child(teamName).set(true);
 
-            // Start listening for real-time room updates
-            this.setupClientSync();
+                // Transition to client lobby view
+                document.getElementById('client-setup-view').classList.add('hidden');
+                document.getElementById('client-lobby-view').classList.remove('hidden');
+                document.getElementById('client-my-team-name').innerText = teamName;
+                
+                const avatarBox = document.getElementById('client-lobby-avatar');
+                avatarBox.style.color = color;
+                avatarBox.style.borderColor = color;
+                avatarBox.style.boxShadow = `0 0 15px ${color}`;
+                avatarBox.innerHTML = CLASS_RANKS[0].avatarSvg;
+
+                this.setupClientSync();
+            });
         };
     }
 
@@ -2168,16 +2354,18 @@ class GameEngine {
             if (!data) return;
 
             const myTeamName = this.clientTeamName;
-            const teams = data.teams || [];
-            const myTeam = teams.find(t => t.name === myTeamName);
+            const players = data.players || {};
+            const myTeam = players[myTeamName];
             
-            // Update client spectator panel
+            this.roomQuestionIdx = data.currentQuestionIdx !== undefined ? data.currentQuestionIdx : 0;
+            
+            if (!myTeam) return;
+
             const waitView = document.getElementById('client-wait-view');
             const quizView = document.getElementById('client-quiz-view');
             const combatView = document.getElementById('client-combat-view');
             const lobbyView = document.getElementById('client-lobby-view');
 
-            // Hide all sub-views first
             lobbyView.classList.add('hidden');
             quizView.classList.add('hidden');
             combatView.classList.add('hidden');
@@ -2189,64 +2377,59 @@ class GameEngine {
                 waitView.classList.remove('hidden');
                 document.getElementById('client-wait-msg').innerText = "Trận đấu đã kết thúc! Hãy xem bảng xếp hạng trên màn hình chính.";
             } else if (data.state === 'quiz') {
-                if (data.activeTeam === myTeamName) {
-                    // It is my turn to answer!
+                const currentQuestion = data.currentQuestion;
+                if (currentQuestion && !myTeam.isEliminated) {
                     quizView.classList.remove('hidden');
-                    document.getElementById('client-quiz-active-team').innerText = myTeamName;
-                    document.getElementById('client-quiz-active-team').style.backgroundColor = myTeam.color;
-                    document.getElementById('client-quiz-instruction').innerText = "Đến lượt của đội bạn! Hãy chọn đáp án:";
+                    document.getElementById('client-question-text').innerText = currentQuestion.text;
                     
-                    // Enable client buttons
-                    const btns = document.querySelectorAll('#client-options-container .option-btn');
-                    btns.forEach((btn, idx) => {
-                        btn.disabled = false;
-                        btn.classList.remove('selected', 'correct', 'incorrect');
-                        btn.onclick = () => {
-                            btns.forEach(b => b.classList.remove('selected'));
+                    const optContainer = document.getElementById('client-options-container');
+                    optContainer.innerHTML = '';
+                    
+                    const myResponse = (data.responses || {})[myTeamName];
+                    
+                    currentQuestion.options.forEach((opt, idx) => {
+                        const letter = String.fromCharCode(65 + idx);
+                        const btn = document.createElement('button');
+                        btn.className = 'option-btn glass-panel';
+                        if (myResponse && myResponse.selectedIdx === idx) {
                             btn.classList.add('selected');
-                            
-                            // Send choice to Firebase
-                            this.firebaseRef.child('selectedAnswers').child(myTeamName).set(idx);
-                            document.getElementById('client-answer-status').innerText = "Đã chọn đáp án " + String.fromCharCode(65 + idx) + ". Đang gửi...";
-                        };
-                    });
-                } else {
-                    // Wait for another team's answer
-                    waitView.classList.remove('hidden');
-                    document.getElementById('client-wait-msg').innerText = `Đang đợi đội '${data.activeTeam}' trả lời câu hỏi...`;
-                }
-            } else if (data.state === 'combat') {
-                if (data.attacker === myTeamName) {
-                    // I am attacking!
-                    combatView.classList.remove('hidden');
-                    
-                    // Render targets
-                    const targetContainer = document.getElementById('client-combat-targets');
-                    targetContainer.innerHTML = '';
-                    
-                    teams.forEach(t => {
-                        if (t.name !== myTeamName && !t.isEliminated) {
-                            const btn = document.createElement('button');
-                            btn.className = 'action-btn secondary-btn';
-                            btn.style.width = '100%';
-                            btn.style.borderColor = t.color;
-                            btn.style.color = t.color;
-                            btn.innerHTML = `TẤN CÔNG: <b>${t.name}</b> (${t.hp} HP)`;
-                            btn.onclick = () => {
-                                // Send attack to Firebase
-                                this.firebaseRef.child('attackTarget').set({
-                                    attacker: myTeamName,
-                                    target: t.id
-                                });
-                                targetContainer.innerHTML = `<p style="color: var(--neon-red); font-weight:bold;">Đang phóng tia laser công kích đối thủ...</p>`;
-                            };
-                            targetContainer.appendChild(btn);
                         }
+                        btn.innerHTML = `
+                            <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
+                            <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4;">${opt}</span>
+                        `;
+                        
+                        if (myResponse) {
+                            btn.disabled = true;
+                        } else {
+                            btn.onclick = () => {
+                                this.submitBattleRoyaleAnswer(idx);
+                            };
+                        }
+                        optContainer.appendChild(btn);
                     });
-                } else {
-                    // Wait for another team to attack
+                    
+                    if (myResponse) {
+                        if (myResponse.isCorrect) {
+                            if (myResponse.hasAttacked) {
+                                quizView.classList.add('hidden');
+                                waitView.classList.remove('hidden');
+                                document.getElementById('client-wait-msg').innerText = "Đã nộp câu trả lời & công kích thành công! Đang chờ câu hỏi tiếp theo...";
+                            } else {
+                                quizView.classList.add('hidden');
+                                this.showBattleRoyaleTargetingScreen(players);
+                            }
+                        } else {
+                            quizView.classList.add('hidden');
+                            waitView.classList.remove('hidden');
+                            document.getElementById('client-wait-msg').innerText = "Trả lời sai! Bị trừ -10 HP. Đang chờ câu hỏi tiếp theo...";
+                        }
+                    } else {
+                        document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
+                    }
+                } else if (myTeam.isEliminated) {
                     waitView.classList.remove('hidden');
-                    document.getElementById('client-wait-msg').innerText = `Đội '${data.attacker}' đang chọn mục tiêu tấn công...`;
+                    document.getElementById('client-wait-msg').innerText = "Bạn đã bị đào thải khỏi lịch sử (0 HP)! Đang xem ở chế độ Quan Sát Viên.";
                 }
             }
 
@@ -2256,7 +2439,7 @@ class GameEngine {
                 const myRank = getClassRank(myTeam.points).rank;
                 statusBox.innerHTML = `
                     <div style="display:flex; justify-content:space-between; align-items:center;">
-                        <span style="font-weight:bold; color:#fff;">Trạng Thái Đội Của Bạn</span>
+                        <span style="font-weight:bold; color:#fff;">Trạng Thái Đấu Sĩ</span>
                         <span class="class-badge ${myRank.badgeClass}">${myRank.title}</span>
                     </div>
                     <div style="margin-top: 10px;">
@@ -2276,11 +2459,151 @@ class GameEngine {
             }
         });
     }
+
+    submitBattleRoyaleAnswer(idx) {
+        const myTeamName = this.clientTeamName;
+        
+        this.firebaseRef.child('currentQuestionIdx').once('value', (snap) => {
+            const currentQIdx = snap.val();
+            const q = this.questions[currentQIdx];
+            const isCorrect = idx === q.correct;
+            
+            this.firebaseRef.child('responses').child(myTeamName).set({
+                selectedIdx: idx,
+                isCorrect: isCorrect,
+                hasAttacked: false
+            });
+            
+            this.firebaseRef.child('players').child(myTeamName).once('value', (psnap) => {
+                const player = psnap.val();
+                if (player) {
+                    let hp = player.hp;
+                    let points = player.points;
+                    let rankIndex = player.rankIndex;
+                    let isEliminated = player.isEliminated;
+                    
+                    if (isCorrect) {
+                        points += 10;
+                        const upgradeCheck = getClassRank(points);
+                        rankIndex = upgradeCheck.rankIndex;
+                        
+                        this.firebaseRef.child('players').child(myTeamName).update({
+                            points: points,
+                            rankIndex: rankIndex
+                        });
+                        
+                        this.logBattleRoyale(`[LUẬN ĐIỂM] Đấu sĩ '${myTeamName}' trả lời ĐÚNG và giành quyền công kích!`);
+                    } else {
+                        hp -= 10;
+                        if (hp <= 0) {
+                            hp = 0;
+                            isEliminated = true;
+                        }
+                        
+                        this.firebaseRef.child('players').child(myTeamName).update({
+                            hp: hp,
+                            isEliminated: isEliminated
+                        });
+                        
+                        this.logBattleRoyale(`[LỆCH LẠC] Đấu sĩ '${myTeamName}' trả lời SAI. Bị trừ -10 HP do lệch lạc lý luận!`);
+                    }
+                }
+            });
+        });
+    }
+
+    showBattleRoyaleTargetingScreen(players) {
+        const combatView = document.getElementById('client-combat-view');
+        combatView.classList.remove('hidden');
+        
+        const targetContainer = document.getElementById('client-combat-targets');
+        targetContainer.innerHTML = '';
+        
+        const myTeamName = this.clientTeamName;
+        
+        Object.keys(players).forEach(name => {
+            const t = players[name];
+            if (name !== myTeamName && !t.isEliminated) {
+                const btn = document.createElement('button');
+                btn.className = 'action-btn secondary-btn';
+                btn.style.width = '100%';
+                btn.style.borderColor = t.color;
+                btn.style.color = t.color;
+                btn.innerHTML = `TẤN CÔNG: <b>${t.name}</b> (${t.hp} HP)`;
+                btn.onclick = () => {
+                    this.executeBattleRoyaleAttack(name, t);
+                };
+                targetContainer.appendChild(btn);
+            }
+        });
+        
+        if (targetContainer.children.length === 0) {
+            targetContainer.innerHTML = `<p style="color: var(--neon-cyan); font-weight:bold;">Không còn đối thủ nào để tấn công!</p>`;
+            setTimeout(() => {
+                this.firebaseRef.child('responses').child(myTeamName).child('hasAttacked').set(true);
+            }, 2000);
+        }
+    }
+
+    executeBattleRoyaleAttack(targetName, target) {
+        const myTeamName = this.clientTeamName;
+        
+        this.firebaseRef.child('players').child(myTeamName).once('value', (asnap) => {
+            const attacker = asnap.val();
+            if (attacker) {
+                const attackerRank = CLASS_RANKS[attacker.rankIndex];
+                let dmg = attackerRank.baseDmg;
+                let isCrit = false;
+                
+                if (attacker.rankIndex === 3 && Math.random() < 0.25) {
+                    dmg = Math.round(dmg * 1.8);
+                    isCrit = true;
+                }
+                
+                let myHpUpdate = {};
+                if (attacker.rankIndex === 4) {
+                    let hp = attacker.hp + 5;
+                    if (hp > attacker.maxHp) hp = attacker.maxHp;
+                    myHpUpdate = { hp: hp };
+                }
+                
+                let targetHp = target.hp - dmg;
+                let targetEliminated = target.isEliminated;
+                if (targetHp <= 0) {
+                    targetHp = 0;
+                    targetEliminated = true;
+                }
+                
+                this.firebaseRef.child('players').child(targetName).update({
+                    hp: targetHp,
+                    isEliminated: targetEliminated
+                });
+                
+                if (attacker.rankIndex === 4) {
+                    this.firebaseRef.child('players').child(myTeamName).update(myHpUpdate);
+                }
+                
+                const critText = isCrit ? " [CHÍ MẠNG!]" : "";
+                this.logBattleRoyale(`[TẤN CÔNG] '${myTeamName}' phóng tia la-ze công kích '${targetName}' trừ -${dmg} HP${critText}!`);
+                
+                if (targetEliminated) {
+                    this.logBattleRoyale(`☠️ [XÓA BỎ] Đấu sĩ '${targetName}' đã bị đào thải khỏi lịch sử!`);
+                }
+                
+                this.firebaseRef.child('responses').child(myTeamName).update({
+                    hasAttacked: true
+                });
+                
+                const targetContainer = document.getElementById('client-combat-targets');
+                targetContainer.innerHTML = `<p style="color: var(--neon-red); font-weight:bold;">Đã nổ súng oanh tạc mục tiêu thành công!</p>`;
+            }
+        });
+    }
 }
 
 // Instantiate global Game variable so inline HTML clicks can query it
 const Game = new GameEngine();
-window.Game = Game; // Explicitly bind to window for inline onclick handlers
+window.Game = Game;
 window.addEventListener('DOMContentLoaded', () => {
     Game.init();
 });

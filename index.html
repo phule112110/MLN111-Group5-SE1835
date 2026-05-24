@@ -278,10 +278,8 @@
             <p style="font-size: 13px; color: var(--text-muted);">Bạn đang kết nối đến Phòng Đấu: <strong id="client-room-display" style="color: var(--neon-gold); font-size: 16px; font-family: 'Orbitron', sans-serif;">----</strong></p>
             
             <div class="form-row" style="text-align: left;">
-                <label for="client-team-select">Chọn Đội Của Bạn:</label>
-                <select id="client-team-select" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none;">
-                    <!-- Team choices will be dynamically injected here -->
-                </select>
+                <label for="client-player-name">Nhập Tên Của Bạn (Tối đa 12 ký tự):</label>
+                <input type="text" id="client-player-name" placeholder="Ví dụ: Anh Tuấn, Minh Thư..." maxlength="12" style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-family: inherit; font-size: 14px; outline: none; margin-top: 5px;">
             </div>
             
             <button id="client-join-btn" class="action-btn primary-btn" style="width: 100%;">THAM GIA PHÒNG ĐẤU</button>
@@ -293,7 +291,7 @@
                 <!-- SVG Avatar -->
             </div>
             <h3 style="color: #fff; font-size: 18px; margin-top: 5px;">Đã kết nối thành công!</h3>
-            <p style="font-size: 14px; color: var(--text-muted);">Đội: <strong id="client-my-team-name" style="font-size: 16px;">-</strong></p>
+            <p style="font-size: 14px; color: var(--text-muted);">Đấu Sĩ: <strong id="client-my-team-name" style="font-size: 16px;">-</strong></p>
             
             <div style="margin: 15px 0; text-align: center;">
                 <p style="font-size: 13px; color: var(--neon-cyan);">Đang đợi Host bắt đầu trận đấu...</p>
@@ -304,25 +302,15 @@
         <!-- VIEW 3: ACTIVE QUIZ ANSWERING -->
         <div id="client-quiz-view" class="hidden flex-col" style="gap: 15px;">
             <div style="background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.05); padding: 12px; border-radius: 8px;">
-                <span style="font-size: 12px; color: var(--text-muted); font-family: 'Orbitron', sans-serif;">Đội Đang Trả Lời</span>
-                <div id="client-quiz-active-team" style="font-size: 16px; font-weight: bold; margin-top: 4px; padding: 4px 10px; border-radius: 6px; display: inline-block;">-</div>
+                <span style="font-size: 12px; color: var(--text-muted); font-family: 'Orbitron', sans-serif;">CÂU HỎI TRỰC TUYẾN</span>
             </div>
             
-            <p id="client-quiz-instruction" style="font-size: 13px; font-weight: bold; color: var(--text-muted);"></p>
+            <div id="client-question-text" style="font-size: 15px; font-weight: 600; line-height: 1.5; color: #fff; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); padding: 15px; border-radius: 10px; text-align: left; word-break: break-word;">
+                Đang tải câu hỏi từ Đấu Trường...
+            </div>
             
             <div class="options-grid" id="client-options-container" style="display: grid; grid-template-columns: 1fr; gap: 12px; width: 100%;">
-                <button class="option-btn glass-panel" data-index="0" style="padding: 20px; justify-content: center; font-size: 20px; font-weight: 800;">
-                    <span class="option-letter" style="background:#ef4444; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">A</span>
-                </button>
-                <button class="option-btn glass-panel" data-index="1" style="padding: 20px; justify-content: center; font-size: 20px; font-weight: 800;">
-                    <span class="option-letter" style="background:#06b6d4; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">B</span>
-                </button>
-                <button class="option-btn glass-panel" data-index="2" style="padding: 20px; justify-content: center; font-size: 20px; font-weight: 800;">
-                    <span class="option-letter" style="background:#a855f7; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">C</span>
-                </button>
-                <button class="option-btn glass-panel" data-index="3" style="padding: 20px; justify-content: center; font-size: 20px; font-weight: 800;">
-                    <span class="option-letter" style="background:#f59e0b; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">D</span>
-                </button>
+                <!-- Dynamic option buttons will be injected here -->
             </div>
             <p id="client-answer-status" style="font-size: 13px; font-weight: bold; margin-top: 10px; color: var(--text-muted);"></p>
         </div>
@@ -331,9 +319,9 @@
         <div id="client-combat-view" class="hidden flex-col" style="gap: 15px;">
             <div class="combat-panel glass-panel" style="padding: 15px; margin: 0; animation: combatPulse 1.5s infinite alternate;">
                 <h3 class="glowing-text red-glow" style="font-size: 18px; margin: 0; font-family: 'Orbitron', sans-serif;">ĐÃ GIÁC NGỘ LÝ LUẬN!</h3>
-                <p style="font-size: 12px; color: #fff; margin-top: 5px;">Đội của bạn được quyền tấn công. Hãy chọn **1 đối thủ** bên dưới để ngắm bắn:</p>
+                <p style="font-size: 12px; color: #fff; margin-top: 5px;">Bạn được quyền tấn công. Hãy chọn **1 đối thủ** bên dưới để ngắm bắn:</p>
             </div>
-            <div id="client-combat-targets" class="flex-col" style="gap: 10px; margin-top: 10px; width: 100%;">
+            <div id="client-combat-targets" class="flex-col" style="gap: 10px; margin-top: 10px; width: 100%; max-height: 250px; overflow-y: auto; padding-right: 5px;">
                 <!-- Target buttons will be dynamically injected here -->
             </div>
         </div>

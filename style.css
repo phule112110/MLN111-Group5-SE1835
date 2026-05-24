@@ -1369,3 +1369,39 @@ header::before {
     color: hsl(var(--neon-gold));
     font-weight: bold;
 }
+
+/* Battle Royale Compact Player Grid styles */
+.teams-grid.compact {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+    gap: 10px;
+}
+
+.teams-grid.compact .team-card {
+    padding: 10px;
+    gap: 6px;
+    min-height: 100px;
+}
+
+.teams-grid.compact .team-card .team-card-header h4 {
+    font-size: 13px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+}
+
+.teams-grid.compact .team-card .hp-container {
+    height: 6px;
+    margin-top: 4px;
+}
+
+.teams-grid.compact .team-card .class-avatar-box {
+    width: 20px;
+    height: 20px;
+}
+
+.teams-grid.compact .team-card.eliminated::after {
+    font-size: 11px;
+    padding: 2px 5px;
+}
+
