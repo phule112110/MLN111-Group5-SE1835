@@ -793,6 +793,9 @@ class GameEngine {
             return;
         }
 
+        // Standardize unicode spaces (non-breaking spaces, thin spaces, etc.) to standard spaces
+        rawText = rawText.replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ');
+
         const lines = rawText.split(/\r?\n/);
         const parsedQuestions = [];
         let currentQuestion = null;
@@ -803,8 +806,9 @@ class GameEngine {
             line = line.trim();
             if (!line) continue;
 
-            // Check if it's a new question
-            const qMatch = line.match(/^\s*(?:Câu|Question)\s*(\d+)[:.\/\-\s]+(.*)/i);
+            // 1. Check if it's a new question
+            // Support optional prefix (Câu/Question/Q) followed by digits and punctuation (:, ., /, -) or space
+            const qMatch = line.match(/^\s*(?:Câu|Question|Q)?\s*(\d+)[:.\/\-\s]+(.*)/i);
             if (qMatch) {
                 if (currentQuestion) {
                     parsedQuestions.push(currentQuestion);
@@ -820,19 +824,8 @@ class GameEngine {
                 continue;
             }
 
-            // Check if it's an option (A, B, C, D)
-            const optMatch = line.match(/^\s*([A-D])\s*[:.\/\)\-\s]+(.*)/i);
-            if (optMatch && currentQuestion) {
-                const optLetter = optMatch[1].toUpperCase();
-                const optIndex = optLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
-                currentQuestion.options[optIndex] = optMatch[2].trim();
-                lastOptionIndex = optIndex;
-                parsingField = 'option';
-                continue;
-            }
-
-            // Check if it's the correct answer
-            const ansMatch = line.match(/^\s*(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng)\s*(?:là)?\s*[:\-\s]*([A-D])/i);
+            // 2. Check if it's the correct answer
+            const ansMatch = line.match(/^\s*(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i);
             if (ansMatch && currentQuestion) {
                 const correctLetter = ansMatch[1].toUpperCase();
                 currentQuestion.correct = correctLetter.charCodeAt(0) - 65;
@@ -840,7 +833,7 @@ class GameEngine {
                 continue;
             }
 
-            // Check if it's an explanation
+            // 3. Check if it's an explanation
             const expMatch = line.match(/^\s*(?:Giải thích|Lời giải|Lý giải)\s*[:\-\s]*(.*)/i);
             if (expMatch && currentQuestion) {
                 currentQuestion.explanation = expMatch[1].trim();
@@ -848,7 +841,23 @@ class GameEngine {
                 continue;
             }
 
-            // It's a continuation line
+            // 4. Check if the line contains options (handles both same-line and multiline options)
+            // Regex to find option patterns: e.g. A. Option value or B: Option value or C) Option value
+            const optionRegex = /(?:^|\s+)([A-D])\s*[:.\/)\-]+\s*(.*?)(?=\s+[A-D]\s*[:.\/)\-]+\s*|$)/gi;
+            const optMatches = [...line.matchAll(optionRegex)];
+
+            if (optMatches.length > 0 && currentQuestion) {
+                optMatches.forEach(match => {
+                    const optLetter = match[1].toUpperCase();
+                    const optIndex = optLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
+                    currentQuestion.options[optIndex] = match[2].trim();
+                    lastOptionIndex = optIndex;
+                });
+                parsingField = 'option';
+                continue;
+            }
+
+            // 5. It's a continuation line (append to the active field)
             if (currentQuestion) {
                 if (parsingField === 'text') {
                     currentQuestion.text += " " + line;
