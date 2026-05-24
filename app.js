@@ -681,6 +681,8 @@ class GameEngine {
         // Settings
         this.initialHp = 100;
         this.questionTime = 30; // seconds
+        this.attackDamage = 15;
+        this.timeoutHpPenalty = 15;
         
         // Game States: 'setup', 'quiz', 'combat_choice', 'ended'
         this.state = 'setup'; 
@@ -1019,9 +1021,6 @@ class GameEngine {
        ---------------------------------------------------------------------- */
     startGame() {
         AudioPlayer.init(); // Initialize audio context on first main interaction
-        
-        this.initialHp = parseInt(document.getElementById('initial-hp').value) || 100;
-        this.questionTime = parseInt(document.getElementById('question-time').value) || 30;
 
         const isMulti = document.getElementById('enable-multi-device').checked;
         if (isMulti) {
@@ -1101,7 +1100,8 @@ class GameEngine {
             this.firebaseRef.update({
                 state: 'quiz',
                 currentQuestionIdx: 0,
-                questionActive: true
+                questionActive: true,
+                timeoutHpPenalty: this.timeoutHpPenalty || 15
             });
 
             AudioPlayer.playLevelUp();
@@ -1366,8 +1366,8 @@ class GameEngine {
 
         document.getElementById('confirm-answer-btn').classList.add('hide');
 
-        // Penalty for timeout (-10 HP due to deviation)
-        const penalty = 10;
+        // Penalty for timeout
+        const penalty = this.timeoutHpPenalty || 15;
         currentTeam.hp -= penalty;
         if (currentTeam.hp < 0) currentTeam.hp = 0;
 
@@ -1479,9 +1479,14 @@ class GameEngine {
 
         AudioPlayer.playAttack();
 
-        // Calculate Damage based on Attacker Class Spec
-        const attackerRank = CLASS_RANKS[attacker.rankIndex];
-        let dmg = attackerRank.baseDmg;
+        // Calculate Damage based on Attacker Class Spec and custom settings base damage
+        let baseDmgSetting = this.attackDamage || 15;
+        let dmg = baseDmgSetting;
+        if (attacker.rankIndex === 1) {
+            dmg = Math.round(baseDmgSetting * 1.2);
+        } else if (attacker.rankIndex === 4) {
+            dmg = Math.round(baseDmgSetting * 1.67);
+        }
         let isCrit = false;
 
         // Specs:
@@ -1783,6 +1788,7 @@ class GameEngine {
                     currentQuestionIdx: 0,
                     questionActive: false,
                     players: {},
+                    timeoutHpPenalty: this.timeoutHpPenalty || 15,
                     battleLogs: [`[HỆ THỐNG] Đấu trường sinh tồn 40 người chơi đã sẵn sàng!`]
                 });
 
@@ -1887,6 +1893,34 @@ class GameEngine {
                     alert("Không thể tự động sao chép! Bạn hãy copy thủ công link ở ô phía trên.");
                 });
             }
+        });
+
+        // Open Settings Modal
+        document.getElementById('open-settings').addEventListener('click', () => {
+            document.getElementById('settings-initial-hp').value = this.initialHp;
+            document.getElementById('settings-question-time').value = this.questionTime;
+            document.getElementById('settings-attack-damage').value = this.attackDamage;
+            document.getElementById('settings-timeout-penalty').value = this.timeoutHpPenalty;
+            
+            document.getElementById('settings-modal').classList.add('active');
+            AudioPlayer.playClick();
+        });
+
+        // Close Settings Modal
+        document.getElementById('close-settings').addEventListener('click', () => {
+            document.getElementById('settings-modal').classList.remove('active');
+            AudioPlayer.playClick();
+        });
+
+        // Save Settings configuration
+        document.getElementById('save-settings-btn').addEventListener('click', () => {
+            this.initialHp = parseInt(document.getElementById('settings-initial-hp').value) || 100;
+            this.questionTime = parseInt(document.getElementById('settings-question-time').value) || 30;
+            this.attackDamage = parseInt(document.getElementById('settings-attack-damage').value) || 15;
+            this.timeoutHpPenalty = parseInt(document.getElementById('settings-timeout-penalty').value) || 15;
+
+            document.getElementById('settings-modal').classList.remove('active');
+            AudioPlayer.playLevelUp();
         });
 
         document.getElementById('confirm-answer-btn').addEventListener('click', () => {
@@ -2492,6 +2526,40 @@ class GameEngine {
             questionActive: false
         });
 
+        // Deduct HP from players who did not submit an answer in time
+        this.firebaseRef.child('responses').once('value', (snap) => {
+            const responses = snap.val() || {};
+            this.firebaseRef.child('players').once('value', (psnap) => {
+                const players = psnap.val() || {};
+                const updates = {};
+                const penalty = this.timeoutHpPenalty || 15;
+                
+                Object.keys(players).forEach(name => {
+                    const p = players[name];
+                    if (!p.isEliminated && !responses[name]) {
+                        let newHp = p.hp - penalty;
+                        let eliminated = p.isEliminated;
+                        if (newHp <= 0) {
+                            newHp = 0;
+                            eliminated = true;
+                        }
+                        
+                        updates[`players/${name}/hp`] = newHp;
+                        updates[`players/${name}/isEliminated`] = eliminated;
+                        
+                        this.logBattleRoyale(`[HẾT GIỜ] Đấu sĩ '${name}' bị trừ -${penalty} HP do không trả lời kịp thời!`);
+                        if (eliminated) {
+                            this.logBattleRoyale(`☠️ [XÓA BỎ] Đấu sĩ '${name}' đã bị đào thải khỏi lịch sử!`);
+                        }
+                    }
+                });
+                
+                if (Object.keys(updates).length > 0) {
+                    this.firebaseRef.update(updates);
+                }
+            });
+        });
+
         document.getElementById('explanation-content').innerText = q.explanation || "Luận điểm Mác - Lênin chuẩn xác.";
         document.getElementById('explanation-modal').classList.add('active');
         
@@ -2629,6 +2697,7 @@ class GameEngine {
                 document.getElementById('client-wait-msg').innerText = "Trận đấu đã kết thúc! Hãy xem bảng xếp hạng trên màn hình chính.";
             } else if (data.state === 'quiz') {
                 const currentQuestion = data.currentQuestion;
+                const isQuestionActive = data.questionActive !== false;
                 if (currentQuestion && !myTeam.isEliminated) {
                     quizView.classList.remove('hidden');
                     document.getElementById('client-question-text').innerText = currentQuestion.text;
@@ -2650,7 +2719,7 @@ class GameEngine {
                             <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4;">${opt}</span>
                         `;
                         
-                        if (myResponse) {
+                        if (myResponse || !isQuestionActive) {
                             btn.disabled = true;
                         } else {
                             btn.onclick = () => {
@@ -2675,6 +2744,10 @@ class GameEngine {
                             waitView.classList.remove('hidden');
                             document.getElementById('client-wait-msg').innerText = "Trả lời sai! Bị trừ -10 HP. Đang chờ câu hỏi tiếp theo...";
                         }
+                    } else if (!isQuestionActive) {
+                        quizView.classList.add('hidden');
+                        waitView.classList.remove('hidden');
+                        document.getElementById('client-wait-msg').innerText = `Hết giờ! Bạn đã bị trừ -${data.timeoutHpPenalty || 15} HP do không đưa ra câu trả lời kịp thời.`;
                     } else {
                         document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
                     }
@@ -2802,8 +2875,14 @@ class GameEngine {
         this.firebaseRef.child('players').child(myTeamName).once('value', (asnap) => {
             const attacker = asnap.val();
             if (attacker) {
-                const attackerRank = CLASS_RANKS[attacker.rankIndex];
-                let dmg = attackerRank.baseDmg;
+                // Calculate Damage based on Attacker Class Spec and custom settings base damage
+                let baseDmgSetting = this.attackDamage || 15;
+                let dmg = baseDmgSetting;
+                if (attacker.rankIndex === 1) {
+                    dmg = Math.round(baseDmgSetting * 1.2);
+                } else if (attacker.rankIndex === 4) {
+                    dmg = Math.round(baseDmgSetting * 1.67);
+                }
                 let isCrit = false;
                 
                 if (attacker.rankIndex === 3 && Math.random() < 0.25) {
