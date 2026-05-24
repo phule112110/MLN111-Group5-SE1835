@@ -47,12 +47,21 @@
             <section id="setup-screen" class="screen active">
                 <div class="setup-grid">
                     <!-- Left: Team Settings -->
-                    <div class="setup-card glass-panel">
-                        <h2><span class="red-glow">01.</span> THÀNH LẬP CÁC ĐỘI ĐẤU TRANH</h2>
-                        <p class="description">Tạo tối thiểu 2 đội và tối đa 10 đội để cùng tham gia cuộc chiến lịch sử.</p>
+                    <div class="setup-card glass-panel" id="setup-left-card">
+                        <h2><span class="red-glow">01.</span> <span id="setup-left-title">THÀNH LẬP CÁC ĐỘI ĐẤU TRANH</span></h2>
+                        <p class="description" id="setup-left-desc">Tạo tối thiểu 2 đội và tối đa 10 đội để cùng tham gia cuộc chiến lịch sử.</p>
                         
                         <div id="teams-input-list">
                             <!-- Team inputs will be injected here dynamically -->
+                        </div>
+
+                        <div id="setup-players-lobby" class="hide" style="width: 100%; margin-top: 15px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 15px;">
+                            <h3 style="font-size: 14px; font-family: 'Orbitron', sans-serif; text-transform: uppercase; margin-bottom: 15px; color: var(--text-muted); text-align: left;">
+                                Trạng Thái Kết Nối Đấu Sĩ (<span id="setup-connected-count">0</span>/40)
+                            </h3>
+                            <div id="setup-lobby-teams-grid" style="display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                                <!-- Connected players appear here in real-time -->
+                            </div>
                         </div>
 
                         <button id="add-team-btn" class="action-btn secondary-btn">
@@ -101,7 +110,19 @@
                             </div>
                         </div>
 
-                        <button id="start-game-btn" class="action-btn primary-btn pulse-glow">
+                        <!-- NEW: QR Code and Room Code appears immediately on Setup Screen -->
+                        <div id="setup-remote-lobby" class="glass-panel sub-panel flex-col hide" style="margin-top: 15px; padding: 15px; align-items: center; gap: 10px; text-align: center;">
+                            <span style="font-size: 11px; color: var(--text-muted); text-transform: uppercase; font-family: 'Orbitron', sans-serif;">Mã Phòng (Room Code)</span>
+                            <span id="setup-room-code" class="glowing-text gold-glow" style="font-size: 36px; font-weight: 900; letter-spacing: 5px; font-family: 'Orbitron', sans-serif; line-height: 1.2;">----</span>
+                            
+                            <div id="setup-qrcode" style="padding: 8px; background: #fff; border-radius: 6px; width: 130px; height: 130px; display: flex; align-items: center; justify-content: center; margin: 5px 0;">
+                                <!-- QR Code generated here -->
+                            </div>
+                            <span style="font-size: 11px; color: var(--text-muted);">Quét QR hoặc nhập link kết nối:</span>
+                            <strong id="setup-url-display" style="font-size: 11px; color: var(--neon-cyan); word-break: break-all; width: 100%; display: block; max-width: 280px;">-</strong>
+                        </div>
+
+                        <button id="start-game-btn" class="action-btn primary-btn pulse-glow" style="margin-top: 15px;">
                             <span class="btn-text">KHỞI ĐỘNG ĐẤU TRƯỜNG</span>
                         </button>
                     </div>
