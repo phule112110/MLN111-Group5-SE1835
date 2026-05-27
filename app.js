@@ -1296,6 +1296,13 @@ class GameEngine {
                 container.scrollTop = container.scrollHeight;
             });
 
+            // Listen for player responses in real-time
+            this.firebaseRef.child('responses').on('value', (snapshot) => {
+                const responses = snapshot.val() || {};
+                this.currentResponses = responses;
+                this.checkAllPlayersAnswered();
+            });
+
             if (this.questions.length === 0) {
                 alert("Ngân hàng câu hỏi trống! Hãy khôi phục mặc định trong mục quản lý câu hỏi.");
                 return;
