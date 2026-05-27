@@ -909,12 +909,25 @@ class GameEngine {
         // Update reveal-answer-btn state/visibility
         const revealBtn = document.getElementById('reveal-answer-btn');
         if (answeredCount === activePlayers.length) {
+            // Write correctAnswerIdx and explanationText to Firebase, and set questionActive to false
+            // so that client pages immediately show the correct answer after everyone has answered!
+            const q = this.shuffledQuestions[this.activeQuestionIdx];
+            if (q) {
+                this.firebaseRef.update({
+                    questionActive: false,
+                    correctAnswerIdx: q.correct,
+                    explanationText: q.explanation || "Luận điểm Mác - Lênin chuẩn xác."
+                });
+            }
+
             if (this.autoShowAnswer) {
                 // Automatically reveal answer
                 this.revealBattleRoyaleExplanation();
             } else {
                 // Show manual reveal button
                 revealBtn.classList.remove('hide');
+                // Stop the countdown timer because everyone has already answered
+                clearInterval(this.timerInterval);
             }
         } else {
             revealBtn.classList.add('hide');
@@ -2725,7 +2738,9 @@ class GameEngine {
                 text: q.text,
                 options: q.options
             },
-            responses: {}
+            responses: {},
+            correctAnswerIdx: null,
+            explanationText: null
         });
 
         this.startBattleRoyaleTimer();
@@ -2773,7 +2788,9 @@ class GameEngine {
         });
 
         this.firebaseRef.update({
-            questionActive: false
+            questionActive: false,
+            correctAnswerIdx: q.correct,
+            explanationText: q.explanation || "Luận điểm Mác - Lênin chuẩn xác."
         });
 
         // Hide reveal button on Host
@@ -3013,58 +3030,118 @@ class GameEngine {
             } else if (data.state === 'quiz') {
                 const currentQuestion = data.currentQuestion;
                 const isQuestionActive = data.questionActive !== false;
+                const correctAnswerIdx = data.correctAnswerIdx;
+                const explanationText = data.explanationText;
+                
                 if (currentQuestion && !myTeam.isEliminated) {
-                    quizView.classList.remove('hidden');
-                    document.getElementById('client-question-text').innerText = currentQuestion.text;
-                    
                     const optContainer = document.getElementById('client-options-container');
-                    optContainer.innerHTML = '';
-                    
                     const myResponse = (data.responses || {})[myTeamName];
+                    const expBox = document.getElementById('client-explanation-box');
+                    const expText = document.getElementById('client-explanation-text');
                     
-                    currentQuestion.options.forEach((opt, idx) => {
-                        const letter = String.fromCharCode(65 + idx);
-                        const btn = document.createElement('button');
-                        btn.className = 'option-btn glass-panel';
-                        if (myResponse && myResponse.selectedIdx === idx) {
-                            btn.classList.add('selected');
-                        }
-                        btn.innerHTML = `
-                            <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
-                            <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4;">${opt}</span>
-                        `;
+                    // If the answer has been revealed (questionActive === false)
+                    if (!isQuestionActive) {
+                        // Hide combat view just in case they were targeting
+                        combatView.classList.add('hidden');
+                        quizView.classList.remove('hidden');
                         
-                        if (myResponse || !isQuestionActive) {
+                        document.getElementById('client-question-text').innerText = currentQuestion.text;
+                        optContainer.innerHTML = '';
+                        
+                        currentQuestion.options.forEach((opt, idx) => {
+                            const letter = String.fromCharCode(65 + idx);
+                            const btn = document.createElement('button');
+                            btn.className = 'option-btn glass-panel';
                             btn.disabled = true;
-                        } else {
-                            btn.onclick = () => {
-                                this.submitBattleRoyaleAnswer(idx);
-                            };
-                        }
-                        optContainer.appendChild(btn);
-                    });
-                    
-                    if (myResponse) {
-                        if (myResponse.isCorrect) {
-                            if (myResponse.hasAttacked) {
-                                quizView.classList.add('hidden');
-                                waitView.classList.remove('hidden');
-                                document.getElementById('client-wait-msg').innerText = "Đã nộp câu trả lời & công kích thành công! Đang chờ câu hỏi tiếp theo...";
+                            
+                            // Highlight styles
+                            if (correctAnswerIdx !== undefined && idx === correctAnswerIdx) {
+                                btn.classList.add('correct');
+                                btn.style.borderColor = 'hsl(var(--neon-green))';
+                                btn.style.background = 'rgba(16,185,129,0.15)';
+                            } else if (myResponse && myResponse.selectedIdx === idx) {
+                                btn.classList.add('incorrect');
+                                btn.style.borderColor = 'hsl(var(--neon-red))';
+                                btn.style.background = 'rgba(239,68,68,0.15)';
+                            }
+                            
+                            btn.innerHTML = `
+                                <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
+                                <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4; color: #fff;">${opt}</span>
+                            `;
+                            optContainer.appendChild(btn);
+                        });
+                        
+                        // Set status message
+                        if (myResponse) {
+                            if (myResponse.selectedIdx === correctAnswerIdx) {
+                                document.getElementById('client-answer-status').innerHTML = `<span style="color: hsl(var(--neon-green)); font-weight: bold;">Chúc mừng! Bạn đã trả lời ĐÚNG.</span>`;
                             } else {
-                                quizView.classList.add('hidden');
-                                this.showBattleRoyaleTargetingScreen(players);
+                                document.getElementById('client-answer-status').innerHTML = `<span style="color: hsl(var(--neon-red)); font-weight: bold;">Tiếc quá! Bạn đã trả lời SAI. Đáp án đúng là ${String.fromCharCode(65 + correctAnswerIdx)}.</span>`;
                             }
                         } else {
-                            quizView.classList.add('hidden');
-                            waitView.classList.remove('hidden');
-                            document.getElementById('client-wait-msg').innerText = "Trả lời sai! Bị trừ -10 HP. Đang chờ câu hỏi tiếp theo...";
+                            document.getElementById('client-answer-status').innerHTML = `<span style="color: hsl(var(--neon-red)); font-weight: bold;">Hết giờ! Bạn đã bị trừ -${data.timeoutHpPenalty || 15} HP do không trả lời kịp thời.</span>`;
                         }
-                    } else if (!isQuestionActive) {
-                        quizView.classList.add('hidden');
-                        waitView.classList.remove('hidden');
-                        document.getElementById('client-wait-msg').innerText = `Hết giờ! Bạn đã bị trừ -${data.timeoutHpPenalty || 15} HP do không đưa ra câu trả lời kịp thời.`;
+                        
+                        // Show explanation box if available
+                        if (explanationText && expBox && expText) {
+                            expText.innerText = explanationText;
+                            expBox.classList.remove('hidden');
+                        } else if (expBox) {
+                            expBox.classList.add('hidden');
+                        }
+                        
                     } else {
-                        document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
+                        // The question is ACTIVE (questionActive === true)
+                        // Hide explanation box
+                        if (expBox) expBox.classList.add('hidden');
+                        
+                        // Check if they need to target first
+                        if (myResponse && myResponse.isCorrect && !myResponse.hasAttacked) {
+                            quizView.classList.add('hidden');
+                            this.showBattleRoyaleTargetingScreen(players);
+                        } else {
+                            quizView.classList.remove('hidden');
+                            document.getElementById('client-question-text').innerText = currentQuestion.text;
+                            optContainer.innerHTML = '';
+                            
+                            currentQuestion.options.forEach((opt, idx) => {
+                                const letter = String.fromCharCode(65 + idx);
+                                const btn = document.createElement('button');
+                                btn.className = 'option-btn glass-panel';
+                                
+                                if (myResponse && myResponse.selectedIdx === idx) {
+                                    btn.classList.add('selected');
+                                    btn.style.borderColor = 'var(--neon-cyan)';
+                                    btn.style.boxShadow = '0 0 10px var(--neon-cyan)';
+                                }
+                                
+                                btn.innerHTML = `
+                                    <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
+                                    <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4; color: #fff;">${opt}</span>
+                                `;
+                                
+                                if (myResponse) {
+                                    btn.disabled = true;
+                                } else {
+                                    btn.onclick = () => {
+                                        this.submitBattleRoyaleAnswer(idx);
+                                    };
+                                }
+                                optContainer.appendChild(btn);
+                            });
+                            
+                            // Set status message
+                            if (myResponse) {
+                                if (myResponse.isCorrect) {
+                                    document.getElementById('client-answer-status').innerHTML = `<span style="color: var(--neon-cyan); font-weight: bold; animation: pulse 1.5s infinite;">Đã ghi nhận câu trả lời ĐÚNG. Chờ các đối thủ khác...</span>`;
+                                } else {
+                                    document.getElementById('client-answer-status').innerHTML = `<span style="color: var(--neon-cyan); font-weight: bold; animation: pulse 1.5s infinite;">Đã ghi nhận câu trả lời SAI. Chờ các đấu sĩ khác...</span>`;
+                                }
+                            } else {
+                                document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
+                            }
+                        }
                     }
                 } else if (myTeam.isEliminated) {
                     waitView.classList.remove('hidden');
