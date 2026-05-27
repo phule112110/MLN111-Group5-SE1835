@@ -3238,6 +3238,36 @@ class GameEngine {
                         <strong>${myTeam.points} pts</strong>
                     </div>
                 `;
+
+                // Update persistent header status bar for player name + HP
+                const persistentBar = document.getElementById('client-persistent-status');
+                if (persistentBar) {
+                    persistentBar.classList.remove('hidden');
+                    
+                    const nameEl = document.getElementById('client-status-name');
+                    if (nameEl) nameEl.innerText = myTeamName;
+                    
+                    const hpTextEl = document.getElementById('client-status-hp-text');
+                    if (hpTextEl) {
+                        hpTextEl.innerText = `${myTeam.hp}/${myTeam.maxHp}`;
+                        if (myTeam.hp <= 30) {
+                            hpTextEl.style.color = 'hsl(var(--neon-red))';
+                        } else {
+                            hpTextEl.style.color = 'hsl(var(--neon-green))';
+                        }
+                    }
+                    
+                    const hpBarEl = document.getElementById('client-status-hp-bar');
+                    if (hpBarEl) {
+                        const pct = (myTeam.hp / myTeam.maxHp) * 100;
+                        hpBarEl.style.width = `${pct}%`;
+                        if (myTeam.hp <= 30) {
+                            hpBarEl.style.background = 'linear-gradient(90deg, hsl(var(--neon-red)), #fff)';
+                        } else {
+                            hpBarEl.style.background = 'linear-gradient(90deg, hsl(var(--neon-green)), #fff)';
+                        }
+                    }
+                }
             }
         });
     }
