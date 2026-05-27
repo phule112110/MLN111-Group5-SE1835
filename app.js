@@ -3111,9 +3111,13 @@ class GameEngine {
                     const expBox = document.getElementById('client-explanation-box');
                     const expText = document.getElementById('client-explanation-text');
                     
-                    // If the answer has been revealed (questionActive === false)
-                    if (!isQuestionActive) {
-                        // Hide combat view just in case they were targeting
+                    // Check if they need to target first (this is active even if the question is revealed,
+                    // so that players who answered correctly don't lose their right to attack!)
+                    if (myResponse && myResponse.isCorrect && !myResponse.hasAttacked) {
+                        quizView.classList.add('hidden');
+                        this.showBattleRoyaleTargetingScreen(players);
+                    } else if (!isQuestionActive) {
+                        // The answer is revealed and they have already attacked (or answered wrong/timed out)
                         combatView.classList.add('hidden');
                         quizView.classList.remove('hidden');
                         
@@ -3168,51 +3172,41 @@ class GameEngine {
                         // Hide explanation box
                         if (expBox) expBox.classList.add('hidden');
                         
-                        // Check if they need to target first
-                        if (myResponse && myResponse.isCorrect && !myResponse.hasAttacked) {
-                            quizView.classList.add('hidden');
-                            this.showBattleRoyaleTargetingScreen(players);
-                        } else {
-                            quizView.classList.remove('hidden');
-                            document.getElementById('client-question-text').innerText = currentQuestion.text;
-                            optContainer.innerHTML = '';
+                        quizView.classList.remove('hidden');
+                        document.getElementById('client-question-text').innerText = currentQuestion.text;
+                        optContainer.innerHTML = '';
+                        
+                        currentQuestion.options.forEach((opt, idx) => {
+                            const letter = String.fromCharCode(65 + idx);
+                            const btn = document.createElement('button');
+                            btn.className = 'option-btn glass-panel';
                             
-                            currentQuestion.options.forEach((opt, idx) => {
-                                const letter = String.fromCharCode(65 + idx);
-                                const btn = document.createElement('button');
-                                btn.className = 'option-btn glass-panel';
-                                
-                                if (myResponse && myResponse.selectedIdx === idx) {
-                                    btn.classList.add('selected');
-                                    btn.style.borderColor = 'var(--neon-cyan)';
-                                    btn.style.boxShadow = '0 0 10px var(--neon-cyan)';
-                                }
-                                
-                                btn.innerHTML = `
-                                    <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
-                                    <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4; color: #fff;">${opt}</span>
-                                `;
-                                
-                                if (myResponse) {
-                                    btn.disabled = true;
-                                } else {
-                                    btn.onclick = () => {
-                                        this.submitBattleRoyaleAnswer(idx);
-                                    };
-                                }
-                                optContainer.appendChild(btn);
-                            });
-                            
-                            // Set status message
-                            if (myResponse) {
-                                if (myResponse.isCorrect) {
-                                    document.getElementById('client-answer-status').innerHTML = `<span style="color: var(--neon-cyan); font-weight: bold; animation: pulse 1.5s infinite;">Đã ghi nhận câu trả lời ĐÚNG. Chờ các đối thủ khác...</span>`;
-                                } else {
-                                    document.getElementById('client-answer-status').innerHTML = `<span style="color: var(--neon-cyan); font-weight: bold; animation: pulse 1.5s infinite;">Đã ghi nhận câu trả lời SAI. Chờ các đấu sĩ khác...</span>`;
-                                }
-                            } else {
-                                document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
+                            if (myResponse && myResponse.selectedIdx === idx) {
+                                btn.classList.add('selected');
+                                btn.style.borderColor = 'var(--neon-cyan)';
+                                btn.style.boxShadow = '0 0 10px var(--neon-cyan)';
                             }
+                            
+                            btn.innerHTML = `
+                                <span class="option-letter" style="background:${idx===0?'#ef4444':idx===1?'#06b6d4':idx===2?'#a855f7':'#f59e0b'}; color:#fff; border:none; width: 36px; height: 36px; font-size: 18px;">${letter}</span>
+                                <span class="option-value" style="margin-left: 15px; font-size: 14px; text-align: left; line-height: 1.4; color: #fff;">${opt}</span>
+                            `;
+                            
+                            if (myResponse) {
+                                btn.disabled = true;
+                            } else {
+                                btn.onclick = () => {
+                                    this.submitBattleRoyaleAnswer(idx);
+                                };
+                            }
+                            optContainer.appendChild(btn);
+                        });
+                        
+                        // Set status message
+                        if (myResponse) {
+                            document.getElementById('client-answer-status').innerHTML = `<span style="color: var(--neon-cyan); font-weight: bold; animation: pulse 1.5s infinite;">Đã ghi nhận câu trả lời. Đang chờ các đấu sĩ khác...</span>`;
+                        } else {
+                            document.getElementById('client-answer-status').innerText = "Hãy đọc câu hỏi và chọn đáp án đúng nhất!";
                         }
                     }
                 } else if (myTeam.isEliminated) {
@@ -3259,15 +3253,23 @@ class GameEngine {
         this.latestPlayersData = players;
         
         const combatView = document.getElementById('client-combat-view');
-        combatView.classList.remove('hidden');
+        if (combatView) combatView.classList.remove('hidden');
         
-        // Show choice buttons, hide manual search area
-        document.getElementById('client-attack-options-choice').classList.remove('hidden');
-        document.getElementById('client-manual-target-area').classList.add('hidden');
+        const choiceArea = document.getElementById('client-attack-options-choice');
+        const manualArea = document.getElementById('client-manual-target-area');
         
-        // Clear search box
-        const searchInput = document.getElementById('client-target-search');
-        if (searchInput) searchInput.value = '';
+        if (manualArea && !manualArea.classList.contains('hidden')) {
+            // Keep manual targeting area visible and update targets list in real-time
+            this.filterClientTargets();
+        } else {
+            // Show choices and hide manual area initially
+            if (choiceArea) choiceArea.classList.remove('hidden');
+            if (manualArea) manualArea.classList.add('hidden');
+            
+            // Clear search box only when transitioning to choice screen
+            const searchInput = document.getElementById('client-target-search');
+            if (searchInput) searchInput.value = '';
+        }
     }
 
     filterClientTargets() {
