@@ -2299,6 +2299,27 @@ class GameEngine {
                 }
             }
 
+            if (this.isMultiDevice && this.firebaseRef) {
+                const roomUpdates = {
+                    initialHp: this.initialHp,
+                    timeoutHpPenalty: this.timeoutHpPenalty
+                };
+                this.firebaseRef.update(roomUpdates);
+
+                // Also update HP/maxHp for all currently registered lobby players
+                this.firebaseRef.child('players').once('value', (snap) => {
+                    const players = snap.val() || {};
+                    const playerUpdates = {};
+                    Object.keys(players).forEach(name => {
+                        playerUpdates[`players/${name}/hp`] = this.initialHp;
+                        playerUpdates[`players/${name}/maxHp`] = this.initialHp;
+                    });
+                    if (Object.keys(playerUpdates).length > 0) {
+                        this.firebaseRef.update(playerUpdates);
+                    }
+                });
+            }
+
             this.saveSettings();
             this.applyCustomRulesText();
             this.updateAutoNextQuestionUI();
@@ -2670,6 +2691,7 @@ class GameEngine {
             currentQuestionIdx: 0,
             questionActive: false,
             players: {},
+            initialHp: this.initialHp || 100,
             timeoutHpPenalty: this.timeoutHpPenalty || 15,
             battleLogs: [`[HỆ THỐNG] Đấu trường sinh tồn 40 người chơi đã sẵn sàng!`]
         });
@@ -3136,12 +3158,15 @@ class GameEngine {
             this.clientTeamName = teamName;
             
             // Check room state first to block late joins!
-            this.firebaseRef.child('state').once('value', (stateSnap) => {
-                const roomState = stateSnap.val();
+            this.firebaseRef.once('value', (roomSnap) => {
+                const roomData = roomSnap.val() || {};
+                const roomState = roomData.state;
                 if (roomState && roomState !== 'lobby') {
                     alert("Đấu trường đã bắt đầu cuộc chiến sinh tồn! Quá hạn tham gia vào phòng đấu.");
                     return;
                 }
+                
+                const startHp = roomData.initialHp !== undefined ? parseInt(roomData.initialHp) : 100;
                 
                 this.firebaseRef.child('players').once('value', (snapshot) => {
                     const players = snapshot.val() || {};
@@ -3161,8 +3186,8 @@ class GameEngine {
                     const newPlayer = {
                         id: Object.keys(players).length,
                         name: teamName,
-                        hp: 100,
-                        maxHp: 100,
+                        hp: startHp,
+                        maxHp: startHp,
                         points: 0,
                         rankIndex: 0,
                         isEliminated: false,
