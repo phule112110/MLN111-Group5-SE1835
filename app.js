@@ -1930,13 +1930,89 @@ class GameEngine {
     }
 
     restart() {
-        document.getElementById('winner-screen').classList.remove('active');
-        document.getElementById('setup-screen').classList.add('active');
+        if (this.timerInterval) clearInterval(this.timerInterval);
+        if (this.autoNextTimer) clearInterval(this.autoNextTimer);
         
-        // Re-inject defaults
-        this.renderSetupTeams();
-        this.state = 'setup';
-        this.logBattle(`[HỆ THỐNG] Đấu trường được thiết lập lại. Lịch sử mới sẵn sàng khởi tạo.`);
+        this.activeQuestionIdx = 0;
+        this.answerConfirmed = false;
+        this.selectedOptionIdx = null;
+        this.currentResponses = {};
+
+        if (this.isMultiDevice && this.firebaseRef) {
+            // Battle Royale Mode: Unbind gameplay listeners
+            this.firebaseRef.child('players').off();
+            this.firebaseRef.child('responses').off();
+            this.firebaseRef.child('battleLogs').off();
+
+            // Reset all players in Firebase and return to the Lobby screen
+            this.firebaseRef.child('players').once('value', (snapshot) => {
+                const players = snapshot.val() || {};
+                const updates = {};
+                const initialHpVal = this.initialHp || 100;
+                
+                Object.keys(players).forEach(name => {
+                    updates[`players/${name}/hp`] = initialHpVal;
+                    updates[`players/${name}/maxHp`] = initialHpVal;
+                    updates[`players/${name}/points`] = 0;
+                    updates[`players/${name}/rankIndex`] = 0;
+                    updates[`players/${name}/isEliminated`] = false;
+                });
+                
+                updates['state'] = 'lobby';
+                updates['currentQuestionIdx'] = 0;
+                updates['questionActive'] = false;
+                updates['responses'] = {};
+                updates['correctAnswerIdx'] = null;
+                updates['explanationText'] = null;
+                updates['battleLogs'] = [`[HỆ THỐNG] Đấu trường sinh tồn đã được tái khởi động! Lịch sử mới bắt đầu.`];
+                
+                this.firebaseRef.update(updates).then(() => {
+                    // Navigate Host back to lobby-screen
+                    document.getElementById('winner-screen').classList.remove('active');
+                    document.getElementById('lobby-screen').classList.add('active');
+                    this.state = 'lobby';
+                    this.logBattle(`[HỆ THỐNG] Đấu trường được tái khởi động. Đang ở phòng chờ kết nối.`);
+                    
+                    // Re-bind Lobby Presence Listener so that the connected list stays updated!
+                    this.firebaseRef.child('players').on('value', (snapshot) => {
+                        const playersData = snapshot.val() || {};
+                        this.teams = Object.keys(playersData).map((name, idx) => {
+                            const p = playersData[name];
+                            return {
+                                id: p.id !== undefined ? p.id : idx,
+                                name: p.name,
+                                hp: p.hp,
+                                maxHp: p.maxHp,
+                                points: p.points,
+                                rankIndex: p.rankIndex,
+                                isEliminated: p.isEliminated,
+                                color: p.color
+                            };
+                        });
+                        this.renderLobbyPlayers();
+                    });
+                });
+            });
+        } else {
+            // Standard Offline Mode: Return to setup-screen
+            document.getElementById('winner-screen').classList.remove('active');
+            document.getElementById('setup-screen').classList.add('active');
+            
+            // Reset player HP/Points in offline mode
+            this.teams = this.teams.map(t => {
+                t.hp = this.initialHp || 100;
+                t.maxHp = this.initialHp || 100;
+                t.points = 0;
+                t.rankIndex = 0;
+                t.isEliminated = false;
+                return t;
+            });
+            
+            this.renderSetupTeams();
+            this.state = 'setup';
+            this.logBattle(`[HỆ THỐNG] Đấu trường được thiết lập lại. Lịch sử mới sẵn sàng khởi tạo.`);
+        }
+        
         AudioPlayer.playClick();
     }
 
