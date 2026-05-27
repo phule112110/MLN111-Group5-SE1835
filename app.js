@@ -920,7 +920,7 @@ class GameEngine {
                 });
             }
 
-            if (this.autoShowAnswer) {
+            if (this.autoShowAnswer || this.autoNextQuestion) {
                 // Automatically reveal answer
                 this.revealBattleRoyaleExplanation();
             } else {
@@ -2213,6 +2213,16 @@ class GameEngine {
             this.autoNextQuestion = document.getElementById('settings-auto-next-question').checked;
             this.customRulesText = document.getElementById('settings-history-rules-text').value || "";
 
+            // If turned off, clear any active auto-next countdown timer
+            if (!this.autoNextQuestion && this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+                const nextBtn = document.getElementById('next-turn-btn');
+                if (nextBtn) {
+                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
+                }
+            }
+
             this.saveSettings();
             this.applyCustomRulesText();
             this.updateAutoNextQuestionUI();
@@ -2233,6 +2243,17 @@ class GameEngine {
             this.autoNextQuestion = !this.autoNextQuestion;
             this.saveSettings();
             this.updateAutoNextQuestionUI();
+            
+            // If turned off, clear any active auto-next countdown timer
+            if (!this.autoNextQuestion && this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+                const nextBtn = document.getElementById('next-turn-btn');
+                if (nextBtn) {
+                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
+                }
+            }
+            
             AudioPlayer.playClick();
         });
 
@@ -2503,10 +2524,32 @@ class GameEngine {
         // Explanation close
         document.getElementById('close-explanation').addEventListener('click', () => {
             document.getElementById('explanation-modal').classList.remove('active');
+            
+            // If they manually close the explanation, pause/clear the auto-next countdown
+            if (this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+                const nextBtn = document.getElementById('next-turn-btn');
+                if (nextBtn) {
+                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
+                }
+            }
+            
             AudioPlayer.playClick();
         });
         document.getElementById('dismiss-explanation').addEventListener('click', () => {
             document.getElementById('explanation-modal').classList.remove('active');
+            
+            // If they manually close the explanation, pause/clear the auto-next countdown
+            if (this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+                const nextBtn = document.getElementById('next-turn-btn');
+                if (nextBtn) {
+                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
+                }
+            }
+            
             AudioPlayer.playClick();
         });
 
