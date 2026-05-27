@@ -229,6 +229,14 @@ header::before {
     transition: var(--transition-normal);
     position: relative;
     overflow: hidden;
+    min-height: 48px;
+    white-space: normal;
+    word-wrap: break-word;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    line-height: 1.2;
+    text-align: center;
 }
 
 .primary-btn {

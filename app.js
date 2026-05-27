@@ -755,6 +755,17 @@ class GameEngine {
         const storedRules = localStorage.getItem('classtruggle_customRulesText');
         if (storedRules !== null) this.customRulesText = storedRules;
         else this.customRulesText = "";
+        
+        if(document.getElementById('settings-initial-hp')) {
+            document.getElementById('settings-initial-hp').value = this.initialHp || 100;
+            document.getElementById('settings-question-time').value = this.questionTime || 30;
+            document.getElementById('settings-attack-damage').value = this.attackDamage || 15;
+            document.getElementById('settings-timeout-penalty').value = this.timeoutHpPenalty || 15;
+            document.getElementById('settings-points-multiplier').value = this.pointsMultiplier || 1.0;
+            document.getElementById('settings-auto-show-answer').checked = this.autoShowAnswer;
+            document.getElementById('settings-auto-next-question').checked = this.autoNextQuestion;
+            document.getElementById('settings-history-rules-text').value = this.customRulesText;
+        }
     }
 
     saveSettings() {
@@ -894,7 +905,7 @@ class GameEngine {
     }
 
     checkAllPlayersAnswered() {
-        if (this.state !== 'quiz' || this.answerConfirmed) return;
+        if (this.state !== 'quiz') return;
         
         const activePlayers = this.teams.filter(t => !t.isEliminated);
         if (activePlayers.length === 0) return;
@@ -909,6 +920,8 @@ class GameEngine {
         // Update reveal-answer-btn state/visibility
         const revealBtn = document.getElementById('reveal-answer-btn');
         if (answeredCount === activePlayers.length) {
+            if (this.answerConfirmed) return; // Prevent double trigger of reveal
+            
             // Write correctAnswerIdx and explanationText to Firebase, and set questionActive to false
             // so that client pages immediately show the correct answer after everyone has answered!
             const q = this.shuffledQuestions[this.activeQuestionIdx];
@@ -935,7 +948,7 @@ class GameEngine {
     }
 
     evaluatePlayerResponses(responses) {
-        if (this.state !== 'quiz' || this.answerConfirmed) return;
+        if (this.state !== 'quiz') return;
         
         const q = this.shuffledQuestions[this.activeQuestionIdx];
         if (!q) return;
@@ -2052,7 +2065,7 @@ class GameEngine {
                 
                 <div class="hp-wrapper">
                     <div class="hp-label">
-                        <span>Lực lượng (HP):</span>
+                        <span>HP:</span>
                         <span>${t.hp}/${t.maxHp}</span>
                     </div>
                     <div class="hp-container">
@@ -2621,32 +2634,10 @@ class GameEngine {
         // Explanation close
         document.getElementById('close-explanation').addEventListener('click', () => {
             document.getElementById('explanation-modal').classList.remove('active');
-            
-            // If they manually close the explanation, pause/clear the auto-next countdown
-            if (this.autoNextTimer) {
-                clearInterval(this.autoNextTimer);
-                this.autoNextTimer = null;
-                const nextBtn = document.getElementById('next-turn-btn');
-                if (nextBtn) {
-                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
-                }
-            }
-            
             AudioPlayer.playClick();
         });
         document.getElementById('dismiss-explanation').addEventListener('click', () => {
             document.getElementById('explanation-modal').classList.remove('active');
-            
-            // If they manually close the explanation, pause/clear the auto-next countdown
-            if (this.autoNextTimer) {
-                clearInterval(this.autoNextTimer);
-                this.autoNextTimer = null;
-                const nextBtn = document.getElementById('next-turn-btn');
-                if (nextBtn) {
-                    nextBtn.innerHTML = this.answerConfirmed ? "Câu Hỏi Tiếp Theo" : "Xem Giải Thích / Tiếp Tục";
-                }
-            }
-            
             AudioPlayer.playClick();
         });
 
@@ -3370,7 +3361,7 @@ class GameEngine {
                     </div>
                     <div style="margin-top: 10px;">
                         <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom: 4px;">
-                            <span>Lực lượng (HP):</span>
+                            <span>HP:</span>
                             <span>${myTeam.hp}/${myTeam.maxHp}</span>
                         </div>
                         <div class="hp-container">
