@@ -18,10 +18,16 @@
     <div id="app-container">
         
         <!-- Header Section -->
-        <header class="glass-panel">
-            <div class="header-logo">
-                <span class="glowing-text red-glow">ĐẤU TRƯỜNG</span>
-                <span class="glowing-text gold-glow">BIỆN CHỨNG</span>
+        <header class="glass-panel" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 15px;">
+                <button id="btn-back-to-home" class="control-btn home-btn hide" title="Trở về Trang Chủ Thiết Lập" style="display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); border-radius: 8px; color: #fff; cursor: pointer; font-family: 'Orbitron', sans-serif; font-size: 11px; font-weight: bold; transition: all 0.3s ease; box-shadow: 0 0 10px rgba(239, 68, 68, 0.15);">
+                    <svg viewBox="0 0 24 24" style="width: 14px; height: 14px; fill: currentColor;"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+                    <span>TRỞ VỀ</span>
+                </button>
+                <div class="header-logo">
+                    <span class="glowing-text red-glow">ĐẤU TRƯỜNG</span>
+                    <span class="glowing-text gold-glow">BIỆN CHỨNG</span>
+                </div>
             </div>
             <div class="header-subtitle">Quiz Sinh Tồn: Giai Cấp & Đấu Tranh Giai Cấp</div>
             <div class="header-controls">
@@ -133,9 +139,15 @@
                     <!-- Left Column: Quiz & Question Control -->
                     <div class="game-left glass-panel">
                         <!-- Top header of the current round -->
-                        <div class="quiz-header">
-                            <div class="round-badge">VÒNG <span id="current-round">1</span></div>
-                            <div class="turn-indicator">Lượt trả lời: <span id="active-team-name" class="active-team-text">Nhóm 1</span></div>
+                        <div class="quiz-header" style="display: flex; justify-content: space-between; align-items: center; width: 100%;">
+                            <div style="display: flex; gap: 10px; align-items: center;">
+                                <div class="round-badge">VÒNG <span id="current-round">1</span></div>
+                                <div class="turn-indicator">Lượt trả lời: <span id="active-team-name" class="active-team-text">Nhóm 1</span></div>
+                            </div>
+                            <button id="host-toggle-auto-next" class="control-btn" style="padding: 6px 12px; font-size: 10px; font-family: 'Orbitron', sans-serif; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); color: #fff; cursor: pointer;" title="Bật/Tắt Tự động chuyển câu">
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;" id="auto-next-indicator-dot"></span>
+                                <span id="auto-next-indicator-text">TỰ ĐỘNG QUA: TẮT</span>
+                            </button>
                         </div>
 
                         <!-- Question Box -->
@@ -170,8 +182,9 @@
                         </div>
 
                         <!-- Quiz Action Panel -->
-                        <div class="quiz-actions">
+                        <div class="quiz-actions" style="display: flex; gap: 10px; width: 100%;">
                             <button id="show-explanation-btn" class="action-btn tertiary-btn hide" disabled>Xem Giải Thích</button>
+                            <button id="reveal-answer-btn" class="action-btn primary-btn pulse-glow hide" style="background: hsl(var(--neon-green)); border-color: hsl(var(--neon-green)); box-shadow: 0 0 10px hsl(var(--neon-green));">HIỆN ĐÁP ÁN</button>
                             <button id="confirm-answer-btn" class="action-btn primary-btn">Xác Nhận Đáp Án</button>
                             <button id="next-turn-btn" class="action-btn secondary-btn hide">Lượt Tiếp Theo</button>
                         </div>
@@ -337,10 +350,22 @@
         <div id="client-combat-view" class="hidden flex-col" style="gap: 15px;">
             <div class="combat-panel glass-panel" style="padding: 15px; margin: 0; animation: combatPulse 1.5s infinite alternate;">
                 <h3 class="glowing-text red-glow" style="font-size: 18px; margin: 0; font-family: 'Orbitron', sans-serif;">ĐÃ GIÁC NGỘ LÝ LUẬN!</h3>
-                <p style="font-size: 12px; color: #fff; margin-top: 5px;">Bạn được quyền tấn công. Hãy chọn **1 đối thủ** bên dưới để ngắm bắn:</p>
+                <p style="font-size: 12px; color: #fff; margin-top: 5px;">Bạn được quyền tấn công. Hãy lựa chọn phương thức đấu tranh:</p>
             </div>
-            <div id="client-combat-targets" class="flex-col" style="gap: 10px; margin-top: 10px; width: 100%; max-height: 250px; overflow-y: auto; padding-right: 5px;">
-                <!-- Target buttons will be dynamically injected here -->
+            
+            <!-- Choice between manual or random attack -->
+            <div id="client-attack-options-choice" class="flex-col" style="gap: 10px; width: 100%;">
+                <button id="client-btn-choose-random" class="action-btn primary-btn pulse-glow" style="width: 100%; font-family: 'Orbitron', sans-serif; background: linear-gradient(135deg, #ef4444, #f59e0b);">⚡ TẤN CÔNG NGẪU NHIÊN 1 NGƯỜI</button>
+                <button id="client-btn-choose-manual" class="action-btn secondary-btn" style="width: 100%; font-family: 'Orbitron', sans-serif;">🎯 TỰ CHỌN ĐỐI THỦ CÔNG KÍCH</button>
+            </div>
+
+            <!-- Manual select area, initially hidden -->
+            <div id="client-manual-target-area" class="flex-col hidden" style="gap: 10px; width: 100%;">
+                <input type="text" id="client-target-search" placeholder="Tìm kiếm đối thủ theo tên..." style="width: 100%; padding: 12px; background: rgba(0,0,0,0.5); color: #fff; border: 1px solid rgba(255,255,255,0.1); border-radius: 8px; font-family: inherit; font-size: 13px; outline: none;" autocomplete="off">
+                <div id="client-combat-targets" class="flex-col" style="gap: 10px; margin-top: 5px; width: 100%; max-height: 200px; overflow-y: auto; padding-right: 5px;">
+                    <!-- Target buttons will be dynamically injected here -->
+                </div>
+                <button id="client-btn-back-to-choice" class="action-btn tertiary-btn small-btn" style="align-self: flex-start; margin-top: 5px; font-size: 11px;">← Quay lại</button>
             </div>
         </div>
 
@@ -350,6 +375,14 @@
             
             <div id="client-my-status" style="margin-top: 15px; padding: 15px; border-radius: 12px; background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.05); text-align: left; display: flex; flex-direction: column; gap: 8px;">
                 <!-- HP and points of client's team will be injected here -->
+            </div>
+
+            <!-- Final Mobile Leaderboard Box (revealed when game ends) -->
+            <div id="client-final-leaderboard-box" class="final-leaderboard-box glass-panel hidden" style="margin-top: 15px; padding: 15px; text-align: left;">
+                <h3 style="font-size: 14px; font-family: 'Orbitron', sans-serif; text-transform: uppercase; margin-bottom: 12px; color: var(--neon-gold); text-shadow: 0 0 5px rgba(245,158,11,0.3); border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 8px;">BẢNG XẾP HẠNG CHUNG CUỘC</h3>
+                <div id="client-leaderboard-list" class="flex-col" style="gap: 8px; max-height: 250px; overflow-y: auto; padding-right: 5px;">
+                    <!-- Dynamic compact leaderboard list elements will be injected here -->
+                </div>
             </div>
         </div>
     </div>
@@ -483,7 +516,7 @@
 
     <!-- MODAL 3: GAME CONFIGURATION SETTINGS -->
     <div id="settings-modal" class="modal-overlay">
-        <div class="modal-box glass-panel small-modal">
+        <div class="modal-box glass-panel small-modal" style="max-height: 90vh; overflow-y: auto;">
             <div class="modal-header">
                 <h2>CẤU HÌNH TRẬN ĐẤU</h2>
                 <button id="close-settings" class="close-btn">&times;</button>
@@ -504,6 +537,22 @@
                 <div class="form-row">
                     <label for="settings-timeout-penalty">HP Bị Trừ Khi Quá Thời Gian:</label>
                     <input type="number" id="settings-timeout-penalty" value="15" min="5" max="50" step="5">
+                </div>
+                <div class="form-row">
+                    <label for="settings-points-multiplier">Tỉ lệ quy đổi Điểm Đấu Tranh / Sát Thương:</label>
+                    <input type="number" id="settings-points-multiplier" value="1.0" min="0.1" max="5.0" step="0.1">
+                </div>
+                <div class="form-row flex-row" style="justify-content: space-between; align-items: center; display: flex; width: 100%;">
+                    <label for="settings-auto-show-answer" style="margin-bottom: 0;">Tự động hiện đáp án khi tất cả trả lời:</label>
+                    <input type="checkbox" id="settings-auto-show-answer" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                </div>
+                <div class="form-row flex-row" style="justify-content: space-between; align-items: center; display: flex; width: 100%;">
+                    <label for="settings-auto-next-question" style="margin-bottom: 0;">Tự động chuyển câu tiếp theo:</label>
+                    <input type="checkbox" id="settings-auto-next-question" style="width: 18px; height: 18px; cursor: pointer; margin: 0;">
+                </div>
+                <div class="form-row flex-col" style="align-items: flex-start; display: flex; flex-direction: column;">
+                    <label for="settings-history-rules-text">Tùy chỉnh Văn bản Quy luật lịch sử:</label>
+                    <textarea id="settings-history-rules-text" style="width: 100%; height: 100px; background: rgba(0, 0, 0, 0.35); border: 1px solid rgba(255, 255, 255, 0.1); color: var(--text-primary); padding: 8px; border-radius: 8px; font-family: inherit; font-size: 11px; resize: none; outline: none; margin-top: 5px;" placeholder="Tự viết quy luật lịch sử hiển thị ở màn hình bên phải khi Setup..."></textarea>
                 </div>
             </div>
             <div class="modal-footer">
