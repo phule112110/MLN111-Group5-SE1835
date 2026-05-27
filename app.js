@@ -934,6 +934,69 @@ class GameEngine {
         }
     }
 
+    evaluatePlayerResponses(responses) {
+        if (this.state !== 'quiz' || this.answerConfirmed) return;
+        
+        const q = this.shuffledQuestions[this.activeQuestionIdx];
+        if (!q) return;
+        
+        const updates = {};
+        let updatedAny = false;
+        
+        Object.keys(responses).forEach(name => {
+            const resp = responses[name];
+            if (resp && resp.isCorrect === undefined) {
+                const isCorrect = resp.selectedIdx === q.correct;
+                
+                updates[`responses/${name}/isCorrect`] = isCorrect;
+                updates[`responses/${name}/hasAttacked`] = false;
+                
+                // Host updates player HP/Points directly!
+                this.firebaseRef.child('players').child(name).once('value', (psnap) => {
+                    const player = psnap.val();
+                    if (player) {
+                        let hp = player.hp;
+                        let points = player.points;
+                        let rankIndex = player.rankIndex;
+                        let isEliminated = player.isEliminated;
+                        
+                        if (isCorrect) {
+                            points += 10;
+                            const upgradeCheck = getClassRank(points);
+                            rankIndex = upgradeCheck.rankIndex;
+                            
+                            this.firebaseRef.child('players').child(name).update({
+                                points: points,
+                                rankIndex: rankIndex
+                            });
+                            
+                            this.logBattleRoyale(`[LUẬN ĐIỂM] Đấu sĩ '${name}' trả lời ĐÚNG và giành quyền công kích!`);
+                        } else {
+                            hp -= 10;
+                            if (hp <= 0) {
+                                hp = 0;
+                                isEliminated = true;
+                            }
+                            
+                            this.firebaseRef.child('players').child(name).update({
+                                hp: hp,
+                                isEliminated: isEliminated
+                            });
+                            
+                            this.logBattleRoyale(`[LỆCH LẠC] Đấu sĩ '${name}' trả lời SAI. Bị trừ -10 HP do lệch lạc lý luận!`);
+                        }
+                    }
+                });
+                
+                updatedAny = true;
+            }
+        });
+        
+        if (updatedAny) {
+            this.firebaseRef.update(updates);
+        }
+    }
+
     /* ----------------------------------------------------------------------
        QUESTION DATABASE MANAGEMENTS (Local Storage)
        ---------------------------------------------------------------------- */
@@ -1300,6 +1363,7 @@ class GameEngine {
             this.firebaseRef.child('responses').on('value', (snapshot) => {
                 const responses = snapshot.val() || {};
                 this.currentResponses = responses;
+                this.evaluatePlayerResponses(responses);
                 this.checkAllPlayersAnswered();
             });
 
@@ -2584,6 +2648,7 @@ class GameEngine {
             this.firebaseRef.child('responses').on('value', (snapshot) => {
                 const responses = snapshot.val() || {};
                 this.currentResponses = responses;
+                this.evaluatePlayerResponses(responses);
                 this.checkAllPlayersAnswered();
             });
 
@@ -3185,53 +3250,8 @@ class GameEngine {
 
     submitBattleRoyaleAnswer(idx) {
         const myTeamName = this.clientTeamName;
-        
-        this.firebaseRef.child('currentQuestionIdx').once('value', (snap) => {
-            const currentQIdx = snap.val();
-            const q = this.questions[currentQIdx];
-            const isCorrect = idx === q.correct;
-            
-            this.firebaseRef.child('responses').child(myTeamName).set({
-                selectedIdx: idx,
-                isCorrect: isCorrect,
-                hasAttacked: false
-            });
-            
-            this.firebaseRef.child('players').child(myTeamName).once('value', (psnap) => {
-                const player = psnap.val();
-                if (player) {
-                    let hp = player.hp;
-                    let points = player.points;
-                    let rankIndex = player.rankIndex;
-                    let isEliminated = player.isEliminated;
-                    
-                    if (isCorrect) {
-                        points += 10;
-                        const upgradeCheck = getClassRank(points);
-                        rankIndex = upgradeCheck.rankIndex;
-                        
-                        this.firebaseRef.child('players').child(myTeamName).update({
-                            points: points,
-                            rankIndex: rankIndex
-                        });
-                        
-                        this.logBattleRoyale(`[LUẬN ĐIỂM] Đấu sĩ '${myTeamName}' trả lời ĐÚNG và giành quyền công kích!`);
-                    } else {
-                        hp -= 10;
-                        if (hp <= 0) {
-                            hp = 0;
-                            isEliminated = true;
-                        }
-                        
-                        this.firebaseRef.child('players').child(myTeamName).update({
-                            hp: hp,
-                            isEliminated: isEliminated
-                        });
-                        
-                        this.logBattleRoyale(`[LỆCH LẠC] Đấu sĩ '${myTeamName}' trả lời SAI. Bị trừ -10 HP do lệch lạc lý luận!`);
-                    }
-                }
-            });
+        this.firebaseRef.child('responses').child(myTeamName).set({
+            selectedIdx: idx
         });
     }
 
