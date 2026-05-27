@@ -3327,6 +3327,13 @@ class GameEngine {
                     isCrit = true;
                 }
                 
+                let damageReduced = 0;
+                if (target.rankIndex === 2) {
+                    const originalDmg = dmg;
+                    dmg = Math.round(dmg * 0.75);
+                    damageReduced = originalDmg - dmg;
+                }
+                
                 let myHpUpdate = {};
                 if (attacker.rankIndex === 4) {
                     let hp = attacker.hp + 5;
@@ -3363,7 +3370,8 @@ class GameEngine {
                 this.firebaseRef.child('players').child(myTeamName).update(attackerUpdate);
                 
                 const critText = isCrit ? " [CHÍ MẠNG!]" : "";
-                this.logBattleRoyale(`[TẤN CÔNG] '${myTeamName}' phóng tia la-ze công kích '${targetName}' gây -${dmg} HP${critText} và nhận +${pointsEarned} Điểm Đấu Tranh!`);
+                const shieldText = damageReduced > 0 ? ` (Lá chắn tư bản hấp thụ -${damageReduced} HP)` : "";
+                this.logBattleRoyale(`[TẤN CÔNG] '${myTeamName}' phóng tia la-ze công kích '${targetName}' gây -${dmg} HP${critText}${shieldText} và nhận +${pointsEarned} Điểm Đấu Tranh!`);
                 
                 if (targetEliminated) {
                     this.logBattleRoyale(`☠️ [XÓA BỎ] Đấu sĩ '${targetName}' đã bị đào thải khỏi lịch sử!`);
