@@ -793,7 +793,7 @@ class GameEngine {
                 <div class="rule-item">
                     <div class="rule-icon info-icon">i</div>
                     <div class="rule-text">
-                        <strong>Trả Lời Đúng (+10 Điểm):</strong> Trở thành chủ thể lịch sử, nhận quyền <strong>Tấn Công (-15 HP)</strong> một đối thủ bất kỳ.
+                        <strong>Trả Lời Đúng :</strong> Trở thành chủ thể lịch sử, nhận quyền <strong>Tấn Công (-15 HP)</strong> một đối thủ bất kỳ.
                     </div>
                 </div>
                 <div class="rule-item">
@@ -805,7 +805,7 @@ class GameEngine {
                 <div class="rule-item">
                     <div class="rule-icon star-icon">★</div>
                     <div class="rule-text">
-                        <strong>Thăng Cấp Giai Cấp:</strong> Tích lũy Điểm Đấu Tranh để tự động thăng cấp giai cấp: Vô Sản ➔ Tiểu Tư Sản ➔ Tư Sản ➔ Trí Thức ➔ Triết Gia để mở khóa các Buff bá đạo.
+                        <strong>Thăng Cấp Giai Cấp:</strong> Tích lũy Điểm Đấu Tranh để tự động thăng cấp giai cấp: Vô Sản ➔ Tiểu Tư Sản ➔ Tư Sản ➔ Trí Thức ➔ Triết Gia
                     </div>
                 </div>
             `;
