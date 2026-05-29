@@ -3140,8 +3140,8 @@ class GameEngine {
                 alert("Vui lòng nhập tên của bạn!");
                 return;
             }
-            if (rawName.length > 12) {
-                alert("Tên quá dài (tối đa 12 ký tự)!");
+            if (rawName.length > 70) {
+                alert("Tên quá dài (tối đa 70 ký tự)!");
                 return;
             }
 
