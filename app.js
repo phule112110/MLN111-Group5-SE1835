@@ -1111,82 +1111,136 @@ class GameEngine {
         // Standardize unicode spaces (non-breaking spaces, thin spaces, etc.) to standard spaces
         rawText = rawText.replace(/[\u00a0\u1680\u2000-\u200a\u2028\u2029\u202f\u205f\u3000]/g, ' ');
 
-        const lines = rawText.split(/\r?\n/);
         const parsedQuestions = [];
-        let currentQuestion = null;
-        let lastOptionIndex = null;
-        let parsingField = null; // 'text', 'option', 'explanation'
 
-        for (let line of lines) {
-            line = line.trim();
-            if (!line) continue;
+        // 1. First, check if the document contains structured question headers
+        // Optional leading bullet, optional Câu/Question/Q, digits, and a punctuation separator
+        const qHeaderRegex = /(?:^|\s+)(?:[\-*•]\s*)?(?:Câu|Question|Q)?\s*(\d+)[:.\/\-]+\s*/gi;
+        const matches = [...rawText.matchAll(qHeaderRegex)];
 
-            // 1. Check if it's a new question
-            // Support optional prefix (Câu/Question/Q) followed by digits and punctuation (:, ., /, -) or space
-            const qMatch = line.match(/^\s*(?:Câu|Question|Q)?\s*(\d+)[:.\/\-\s]+(.*)/i);
-            if (qMatch) {
-                if (currentQuestion) {
-                    parsedQuestions.push(currentQuestion);
+        if (matches.length > 0) {
+            // Block-based parser: extremely robust for both single-line and multi-line formatting
+            for (let i = 0; i < matches.length; i++) {
+                const startIdx = matches[i].index + matches[i][0].length;
+                const endIdx = (i + 1 < matches.length) ? matches[i + 1].index : rawText.length;
+                const block = rawText.substring(startIdx, endIdx).trim();
+                if (!block) continue;
+
+                let blockText = block;
+
+                // A. Extract correct answer
+                let correct = null;
+                const ansRegex = /(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i;
+                const ansMatch = blockText.match(ansRegex);
+                if (ansMatch) {
+                    correct = ansMatch[1].toUpperCase().charCodeAt(0) - 65;
+                    blockText = blockText.replace(ansRegex, ' ');
                 }
-                currentQuestion = {
-                    text: qMatch[2].trim(),
-                    options: [],
-                    correct: null,
-                    explanation: ''
-                };
-                lastOptionIndex = null;
-                parsingField = 'text';
-                continue;
-            }
 
-            // 2. Check if it's the correct answer
-            const ansMatch = line.match(/^\s*(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i);
-            if (ansMatch && currentQuestion) {
-                const correctLetter = ansMatch[1].toUpperCase();
-                currentQuestion.correct = correctLetter.charCodeAt(0) - 65;
-                parsingField = 'correct';
-                continue;
-            }
+                // B. Extract explanation
+                let explanation = "";
+                const expRegex = /(?:Giải thích|Lời giải|Lý giải)\s*[:\-\s]*(.*)/i;
+                const expMatch = blockText.match(expRegex);
+                if (expMatch) {
+                    explanation = expMatch[1].trim();
+                    blockText = blockText.replace(expRegex, ' ');
+                }
 
-            // 3. Check if it's an explanation
-            const expMatch = line.match(/^\s*(?:Giải thích|Lời giải|Lý giải)\s*[:\-\s]*(.*)/i);
-            if (expMatch && currentQuestion) {
-                currentQuestion.explanation = expMatch[1].trim();
-                parsingField = 'explanation';
-                continue;
-            }
+                // C. Extract options (supports same-line and multi-line options, handles bullet/list symbols)
+                const options = [];
+                const optionRegex = /(?:^|[^a-zA-Z0-9])([A-D])\s*[:.\/)\-]+\s*(.*?)(?=(?:^|[^a-zA-Z0-9])[A-D]\s*[:.\/)\-]+\s*|$)/gi;
+                const optMatches = [...blockText.matchAll(optionRegex)];
 
-            // 4. Check if the line contains options (handles both same-line and multiline options)
-            // Regex to find option patterns: e.g. A. Option value or B: Option value or C) Option value
-            const optionRegex = /(?:^|\s+)([A-D])\s*[:.\/)\-]+\s*(.*?)(?=\s+[A-D]\s*[:.\/)\-]+\s*|$)/gi;
-            const optMatches = [...line.matchAll(optionRegex)];
-
-            if (optMatches.length > 0 && currentQuestion) {
+                let tempBlockText = blockText;
                 optMatches.forEach(match => {
                     const optLetter = match[1].toUpperCase();
-                    const optIndex = optLetter.charCodeAt(0) - 65; // A=0, B=1, C=2, D=3
-                    currentQuestion.options[optIndex] = match[2].trim();
-                    lastOptionIndex = optIndex;
+                    const optIndex = optLetter.charCodeAt(0) - 65;
+                    options[optIndex] = match[2].trim();
+                    tempBlockText = tempBlockText.replace(match[0], ' ');
                 });
-                parsingField = 'option';
-                continue;
-            }
 
-            // 5. It's a continuation line (append to the active field)
-            if (currentQuestion) {
-                if (parsingField === 'text') {
-                    currentQuestion.text += " " + line;
-                } else if (parsingField === 'option' && lastOptionIndex !== null) {
-                    currentQuestion.options[lastOptionIndex] += " " + line;
-                } else if (parsingField === 'explanation') {
-                    currentQuestion.explanation += " " + line;
+                // D. The remaining text is the question text
+                let questionText = tempBlockText.replace(/\s+/g, ' ').trim();
+                // Clean up any trailing answer letters that might have been left over
+                questionText = questionText.replace(/\s+[A-D]$/i, '').trim();
+
+                parsedQuestions.push({
+                    text: questionText,
+                    options: options,
+                    correct: correct,
+                    explanation: explanation
+                });
+            }
+        } else {
+            // Fallback: Line-by-line parser for simple text documents
+            const lines = rawText.split(/\r?\n/);
+            let currentQuestion = null;
+            let lastOptionIndex = null;
+            let parsingField = null; // 'text', 'option', 'explanation'
+
+            for (let line of lines) {
+                line = line.trim();
+                if (!line) continue;
+
+                const qMatch = line.match(/^\s*(?:[\-*•]\s*)?(?:Câu|Question|Q)?\s*(\d+)[:.\/\-\s]+(.*)/i);
+                if (qMatch) {
+                    if (currentQuestion) {
+                        parsedQuestions.push(currentQuestion);
+                    }
+                    currentQuestion = {
+                        text: qMatch[2].trim(),
+                        options: [],
+                        correct: null,
+                        explanation: ''
+                    };
+                    lastOptionIndex = null;
+                    parsingField = 'text';
+                    continue;
+                }
+
+                const ansMatch = line.match(/^\s*(?:[\-*•]\s*)?(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i);
+                if (ansMatch && currentQuestion) {
+                    const correctLetter = ansMatch[1].toUpperCase();
+                    currentQuestion.correct = correctLetter.charCodeAt(0) - 65;
+                    parsingField = 'correct';
+                    continue;
+                }
+
+                const expMatch = line.match(/^\s*(?:[\-*•]\s*)?(?:Giải thích|Lời giải|Lý giải)\s*[:\-\s]*(.*)/i);
+                if (expMatch && currentQuestion) {
+                    currentQuestion.explanation = expMatch[1].trim();
+                    parsingField = 'explanation';
+                    continue;
+                }
+
+                const optionRegex = /(?:^|[^a-zA-Z0-9])([A-D])\s*[:.\/)\-]+\s*(.*?)(?=(?:^|[^a-zA-Z0-9])[A-D]\s*[:.\/)\-]+\s*|$)/gi;
+                const optMatches = [...line.matchAll(optionRegex)];
+
+                if (optMatches.length > 0 && currentQuestion) {
+                    optMatches.forEach(match => {
+                        const optLetter = match[1].toUpperCase();
+                        const optIndex = optLetter.charCodeAt(0) - 65;
+                        currentQuestion.options[optIndex] = match[2].trim();
+                        lastOptionIndex = optIndex;
+                    });
+                    parsingField = 'option';
+                    continue;
+                }
+
+                if (currentQuestion) {
+                    if (parsingField === 'text') {
+                        currentQuestion.text += " " + line;
+                    } else if (parsingField === 'option' && lastOptionIndex !== null) {
+                        currentQuestion.options[lastOptionIndex] += " " + line;
+                    } else if (parsingField === 'explanation') {
+                        currentQuestion.explanation += " " + line;
+                    }
                 }
             }
-        }
 
-        // Push the last question
-        if (currentQuestion) {
-            parsedQuestions.push(currentQuestion);
+            if (currentQuestion) {
+                parsedQuestions.push(currentQuestion);
+            }
         }
 
         // Validate and clean up parsed questions
