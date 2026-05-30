@@ -1907,11 +1907,25 @@ class GameEngine {
 
     endGame() {
         if (this.timerInterval) clearInterval(this.timerInterval);
+        if (this.autoNextTimer) {
+            clearInterval(this.autoNextTimer);
+            this.autoNextTimer = null;
+        }
         this.state = 'ended';
 
-        if (this.isMultiDevice) {
+        if (this.isMultiDevice && this.firebaseRef) {
+            // Unbind gameplay listeners to prevent any further updates overriding ended state
+            this.firebaseRef.child('players').off();
+            this.firebaseRef.child('responses').off();
+            this.firebaseRef.child('battleLogs').off();
+
             this.firebaseRef.update({
                 state: 'ended',
+                currentPhaseLabel: "",
+                phaseEndTime: 0,
+                phaseTotalTime: 0,
+                combatPhaseActive: false,
+                questionActive: false,
                 teams: this.teams.map(t => ({
                     id: t.id,
                     name: t.name,
@@ -2967,6 +2981,7 @@ class GameEngine {
     }
 
     nextBattleRoyaleQuestion() {
+        if (this.state === 'ended') return;
         this.answerConfirmed = false;
         this.selectedOptionIdx = null;
 
@@ -3030,6 +3045,7 @@ class GameEngine {
     }
 
     startBattleRoyaleTimer() {
+        if (this.state === 'ended') return;
         if (this.timerInterval) clearInterval(this.timerInterval);
 
         this.timeLeft = this.questionTime;
@@ -3066,6 +3082,7 @@ class GameEngine {
     }
 
     revealBattleRoyaleExplanation() {
+        if (this.state === 'ended') return;
         if (this.answerConfirmed) return;
         clearInterval(this.timerInterval);
         this.answerConfirmed = true;
@@ -3140,6 +3157,11 @@ class GameEngine {
 
         if (this.autoNextTimer) clearInterval(this.autoNextTimer);
         this.autoNextTimer = setInterval(() => {
+            if (this.state === 'ended') {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+                return;
+            }
             if (this.isPaused) return;
             this.phaseRemaining--;
             if (this.combatPhaseState === 'result') {
@@ -3198,6 +3220,7 @@ class GameEngine {
     }
 
     handleBattleRoyaleNextStep() {
+        if (this.state === 'ended') return;
         AudioPlayer.playClick();
         if (!this.answerConfirmed) {
             this.revealBattleRoyaleExplanation();
@@ -3217,6 +3240,11 @@ class GameEngine {
             const nextBtn = document.getElementById('next-turn-btn');
             nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
             this.autoNextTimer = setInterval(() => {
+                if (this.state === 'ended') {
+                    clearInterval(this.autoNextTimer);
+                    this.autoNextTimer = null;
+                    return;
+                }
                 if (this.isPaused) return;
                 this.phaseRemaining--;
                 nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
