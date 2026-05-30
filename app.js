@@ -2354,6 +2354,16 @@ class GameEngine {
             this.autoNextQuestion = !this.autoNextQuestion;
             this.saveSettings();
             this.updateAutoNextQuestionUI();
+            AudioPlayer.playClick();
+        });
+
+        // Host pause button
+        document.getElementById('host-pause-btn').addEventListener('click', () => {
+            this.togglePause();
+        });
+            this.autoNextQuestion = !this.autoNextQuestion;
+            this.saveSettings();
+            this.updateAutoNextQuestionUI();
             
             // If turned off, clear any active auto-next countdown timer
             if (!this.autoNextQuestion && this.autoNextTimer) {
@@ -2984,30 +2994,32 @@ class GameEngine {
     startBattleRoyaleTimer() {
         if (this.timerInterval) clearInterval(this.timerInterval);
 
-        this.timeLeft = this.questionTime;
+        this.phaseRemaining = this.questionTime;
         const timerBar = document.getElementById('timer-bar');
         const timerText = document.getElementById('timer-text');
 
         timerBar.style.width = '100%';
-        timerText.innerText = `${this.timeLeft}s`;
+        timerText.innerText = `${this.phaseRemaining}s`;
 
-        const endTime = Date.now() + this.timeLeft * 1000;
+        const endTime = Date.now() + this.phaseRemaining * 1000;
         this.firebaseRef.update({
             phaseEndTime: endTime,
-            phaseTotalTime: this.timeLeft,
+            phaseTotalTime: this.questionTime,
             currentPhaseLabel: "THỜI GIAN TRẢ LỜI"
         });
 
         this.timerInterval = setInterval(() => {
-            this.timeLeft--;
-            timerText.innerText = `${this.timeLeft}s`;
-            timerBar.style.width = `${(this.timeLeft / this.questionTime) * 100}%`;
+            if (this.isPaused) return;
+            this.phaseRemaining--;
+            this.timeLeft = this.phaseRemaining; // sync old var just in case
+            timerText.innerText = `${this.phaseRemaining}s`;
+            timerBar.style.width = `${(this.phaseRemaining / this.questionTime) * 100}%`;
 
-            if (this.timeLeft <= 5 && this.timeLeft > 0) {
+            if (this.phaseRemaining <= 5 && this.phaseRemaining > 0) {
                 AudioPlayer.playTick();
             }
 
-            if (this.timeLeft <= 0) {
+            if (this.phaseRemaining <= 0) {
                 clearInterval(this.timerInterval);
                 this.revealBattleRoyaleExplanation();
             }
@@ -3078,35 +3090,36 @@ class GameEngine {
         
         const nextBtn = document.getElementById('next-turn-btn');
         this.combatPhaseState = 'result';
-        let delay = 10; // 10s result viewing
-        const endTime = Date.now() + delay * 1000;
+        this.phaseRemaining = 10; // 10s result viewing
+        const endTime = Date.now() + this.phaseRemaining * 1000;
         this.firebaseRef.update({
             phaseEndTime: endTime,
-            phaseTotalTime: delay,
+            phaseTotalTime: 10,
             currentPhaseLabel: "XEM KẾT QUẢ"
         });
-        nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
+        nextBtn.innerHTML = `Chuẩn bị Tấn Công (${this.phaseRemaining}s)`;
 
         if (this.autoNextTimer) clearInterval(this.autoNextTimer);
         this.autoNextTimer = setInterval(() => {
-            delay--;
+            if (this.isPaused) return;
+            this.phaseRemaining--;
             if (this.combatPhaseState === 'result') {
-                nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                nextBtn.innerHTML = `Chuẩn bị Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'attack';
-                    delay = 10;
-                    const attackEndTime = Date.now() + delay * 1000;
+                    this.phaseRemaining = 10;
+                    const attackEndTime = Date.now() + this.phaseRemaining * 1000;
                     this.firebaseRef.update({ 
                         combatPhaseActive: true,
                         phaseEndTime: attackEndTime,
-                        phaseTotalTime: delay,
+                        phaseTotalTime: 10,
                         currentPhaseLabel: "TẤN CÔNG"
                     });
-                    nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+                    nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
                 }
             } else if (this.combatPhaseState === 'attack') {
-                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'done';
                     this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
@@ -3120,6 +3133,31 @@ class GameEngine {
         }, 1000);
     }
 
+    togglePause() {
+        if (!this.firebaseRef || this.state !== 'quiz') return;
+        this.isPaused = !this.isPaused;
+        AudioPlayer.playClick();
+        
+        const dot = document.getElementById('pause-indicator-dot');
+        const text = document.getElementById('pause-indicator-text');
+        
+        if (this.isPaused) {
+            dot.style.background = '#f59e0b';
+            text.innerText = 'TIẾP TỤC';
+            this.firebaseRef.update({
+                isPaused: true,
+                pausedPhaseTimeLeft: this.phaseRemaining
+            });
+        } else {
+            dot.style.background = '#10b981';
+            text.innerText = 'TẠM DỪNG';
+            this.firebaseRef.update({
+                isPaused: false,
+                phaseEndTime: Date.now() + this.phaseRemaining * 1000
+            });
+        }
+    }
+
     handleBattleRoyaleNextStep() {
         AudioPlayer.playClick();
         if (!this.answerConfirmed) {
@@ -3127,22 +3165,23 @@ class GameEngine {
         } else if (this.combatPhaseState === 'result') {
             // Skip result phase, go straight to attack phase
             this.combatPhaseState = 'attack';
-            let delay = 10;
-            const attackEndTime = Date.now() + delay * 1000;
+            this.phaseRemaining = 10;
+            const attackEndTime = Date.now() + this.phaseRemaining * 1000;
             this.firebaseRef.update({ 
                 combatPhaseActive: true,
                 phaseEndTime: attackEndTime,
-                phaseTotalTime: delay,
+                phaseTotalTime: 10,
                 currentPhaseLabel: "TẤN CÔNG"
             });
             
             if (this.autoNextTimer) clearInterval(this.autoNextTimer);
             const nextBtn = document.getElementById('next-turn-btn');
-            nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+            nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
             this.autoNextTimer = setInterval(() => {
-                delay--;
-                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                if (this.isPaused) return;
+                this.phaseRemaining--;
+                nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'done';
                     this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
@@ -3316,6 +3355,16 @@ class GameEngine {
             const data = snapshot.val();
             if (!data) return;
             this.latestRoomData = data;
+            
+            // Handle pause overlay
+            const pauseOverlay = document.getElementById('client-pause-overlay');
+            if (pauseOverlay) {
+                if (data.isPaused) {
+                    pauseOverlay.classList.remove('hidden');
+                } else {
+                    pauseOverlay.classList.add('hidden');
+                }
+            }
 
             const myTeamName = this.clientTeamName;
             const players = data.players || {};
@@ -3703,7 +3752,13 @@ class GameEngine {
             }
             if (container) container.classList.remove('hidden');
             
-            const remaining = Math.max(0, this.latestRoomData.phaseEndTime - Date.now());
+            let remaining = 0;
+            if (this.latestRoomData.isPaused && this.latestRoomData.pausedPhaseTimeLeft !== undefined) {
+                remaining = this.latestRoomData.pausedPhaseTimeLeft * 1000;
+            } else {
+                remaining = Math.max(0, this.latestRoomData.phaseEndTime - Date.now());
+            }
+            
             const total = this.latestRoomData.phaseTotalTime * 1000;
             const pct = total > 0 ? (remaining / total) * 100 : 0;
             
