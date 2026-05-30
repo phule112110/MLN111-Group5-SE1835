@@ -2833,8 +2833,11 @@ class GameEngine {
 
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <strong style="font-size:14px; color:#fff">${t.name}</strong>
-                    <span style="font-size:10px; font-weight:bold; color:hsl(var(--neon-green))">● Đã kết nối</span>
+                    <strong style="font-size:14px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:120px;" title="${t.name}">${t.name}</strong>
+                    <div>
+                        <span style="font-size:10px; font-weight:bold; color:hsl(var(--neon-green)); margin-right: 5px;">● Đã kết nối</span>
+                        <button class="kick-player-btn" data-name="${t.name}" style="background: none; border: none; color: hsl(var(--neon-red)); font-size: 16px; cursor: pointer; padding: 0;" title="Đuổi người chơi">×</button>
+                    </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:8px;">
                     <span style="font-size:11px; font-family:'Orbitron',sans-serif;">${currentRank.title}</span>
@@ -2844,6 +2847,17 @@ class GameEngine {
                 </div>
             `;
             grid.appendChild(card);
+        });
+
+        const kickBtns = grid.querySelectorAll('.kick-player-btn');
+        kickBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const name = e.target.dataset.name;
+                if (confirm(`Bạn có chắc muốn đuổi người chơi "${name}" khỏi phòng không?`)) {
+                    this.firebaseRef.child('players').child(name).remove();
+                    this.firebaseRef.child('connectedClients').child(name).remove();
+                }
+            });
         });
 
         document.getElementById('connected-count').innerText = this.teams.length;
@@ -2871,8 +2885,11 @@ class GameEngine {
 
             card.innerHTML = `
                 <div style="display:flex; justify-content:space-between; align-items:center; width:100%;">
-                    <strong style="font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:80px;" title="${t.name}">${t.name}</strong>
-                    <span style="font-size:8px; font-weight:bold; color:hsl(var(--neon-green))">● OK</span>
+                    <strong style="font-size:12px; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:65px;" title="${t.name}">${t.name}</strong>
+                    <div>
+                        <span style="font-size:8px; font-weight:bold; color:hsl(var(--neon-green)); margin-right: 3px;">● OK</span>
+                        <button class="kick-player-btn" data-name="${t.name}" style="background: none; border: none; color: hsl(var(--neon-red)); font-size: 14px; cursor: pointer; padding: 0;" title="Đuổi người chơi">×</button>
+                    </div>
                 </div>
                 <div style="display:flex; justify-content:space-between; align-items:center; margin-top:2px;">
                     <span style="font-size:10px; font-family:'Orbitron',sans-serif;">${currentRank.title}</span>
@@ -2882,6 +2899,17 @@ class GameEngine {
                 </div>
             `;
             grid.appendChild(card);
+        });
+
+        const kickBtns = grid.querySelectorAll('.kick-player-btn');
+        kickBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const name = e.target.dataset.name;
+                if (confirm(`Bạn có chắc muốn đuổi người chơi "${name}" khỏi phòng không?`)) {
+                    this.firebaseRef.child('players').child(name).remove();
+                    this.firebaseRef.child('connectedClients').child(name).remove();
+                }
+            });
         });
 
         const countEl = document.getElementById('setup-connected-count');
@@ -3265,7 +3293,13 @@ class GameEngine {
             
             this.roomQuestionIdx = data.currentQuestionIdx !== undefined ? data.currentQuestionIdx : 0;
             
-            if (!myTeam) return;
+            if (!myTeam) {
+                // The player was kicked
+                this.firebaseRef.off();
+                alert("Bạn đã bị Host đưa ra khỏi Đấu Trường!");
+                location.reload();
+                return;
+            }
 
             const waitView = document.getElementById('client-wait-view');
             const quizView = document.getElementById('client-quiz-view');
