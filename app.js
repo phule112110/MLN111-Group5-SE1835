@@ -686,6 +686,7 @@ class GameEngine {
         this.pointsMultiplier = 1.0;
         this.autoShowAnswer = false;
         this.autoNextQuestion = false;
+        this.enableClassUpgrade = true;
         this.customRulesText = "";
         
         // Timer references
@@ -764,6 +765,10 @@ class GameEngine {
         if (storedRules !== null) this.customRulesText = storedRules;
         else this.customRulesText = "";
         
+        const storedUpgrade = localStorage.getItem('classtruggle_enableClassUpgrade');
+        if (storedUpgrade) this.enableClassUpgrade = storedUpgrade === 'true';
+        else this.enableClassUpgrade = true;
+        
         if(document.getElementById('settings-initial-hp')) {
             document.getElementById('settings-initial-hp').value = this.initialHp || 100;
             document.getElementById('settings-question-time').value = this.questionTime || 30;
@@ -772,6 +777,7 @@ class GameEngine {
             document.getElementById('settings-points-multiplier').value = this.pointsMultiplier || 1.0;
             document.getElementById('settings-auto-show-answer').checked = this.autoShowAnswer;
             document.getElementById('settings-auto-next-question').checked = this.autoNextQuestion;
+            document.getElementById('settings-enable-class-upgrade').checked = this.enableClassUpgrade;
             document.getElementById('settings-history-rules-text').value = this.customRulesText;
         }
     }
@@ -784,6 +790,7 @@ class GameEngine {
         localStorage.setItem('classtruggle_pointsMultiplier', this.pointsMultiplier);
         localStorage.setItem('classtruggle_autoShowAnswer', this.autoShowAnswer);
         localStorage.setItem('classtruggle_autoNextQuestion', this.autoNextQuestion);
+        localStorage.setItem('classtruggle_enableClassUpgrade', this.enableClassUpgrade);
         localStorage.setItem('classtruggle_customRulesText', this.customRulesText);
     }
 
@@ -816,12 +823,21 @@ class GameEngine {
                         <strong>Quá Thời Gian <span id="rule-timeout-hp">(-${this.timeoutHpPenalty} HP)</span>:</strong> Tổn hại sinh mạng do không đưa ra lựa chọn kịp thời.
                     </div>
                 </div>
+                ${this.enableClassUpgrade ? `
                 <div class="rule-item">
                     <div class="rule-icon star-icon">★</div>
                     <div class="rule-text">
                         <strong>Thăng Cấp :</strong> Tích lũy điểm Đấu Tranh để thăng cấp: <strong>Vô Sản</strong> ➔ <strong>Tiểu Tư Sản</strong> (Tăng +20% Sát thương) ➔ <strong>Tư Sản</strong> (Giảm 25% Sát thương nhận) ➔ <strong>Trí Thức</strong> (25% cơ hội Chí mạng x1.8 Sát thương) ➔ <strong>Triết Gia</strong> (Tăng +67% Sát thương & Hồi 5 HP mỗi lượt).
                     </div>
                 </div>
+                ` : `
+                <div class="rule-item" style="opacity: 0.5; border-color: rgba(255, 255, 255, 0.05);">
+                    <div class="rule-icon star-icon" style="background: rgba(255, 255, 255, 0.1); color: var(--text-muted);">★</div>
+                    <div class="rule-text" style="color: var(--text-muted);">
+                        <strong>Thăng Cấp :</strong> <span style="color: #ef4444; font-weight: bold;">ĐÃ TẮT</span> (Mọi Đấu sĩ giữ nguyên giai cấp Vô Sản bình đẳng).
+                    </div>
+                </div>
+                `}
             `;
         }
     }
@@ -993,7 +1009,7 @@ class GameEngine {
                         if (isCorrect) {
                             points += 10;
                             const upgradeCheck = getClassRank(points);
-                            rankIndex = upgradeCheck.rankIndex;
+                            rankIndex = this.enableClassUpgrade ? upgradeCheck.rankIndex : 0;
                             
                             this.firebaseRef.child('players').child(name).update({
                                 points: points,
@@ -1711,7 +1727,7 @@ class GameEngine {
         // Check upgrade
         const oldRankIdx = team.rankIndex;
         const upgradeCheck = getClassRank(team.points);
-        if (upgradeCheck.rankIndex > oldRankIdx) {
+        if (this.enableClassUpgrade && upgradeCheck.rankIndex > oldRankIdx) {
             team.rankIndex = upgradeCheck.rankIndex;
             this.logBattle(`🌟 THĂNG CẤP LỊCH SỬ! Đội '${team.name}' đã vươn lên thành giai cấp: ${upgradeCheck.rank.title}!`, 'upgrade');
             AudioPlayer.playLevelUp();
@@ -2301,6 +2317,7 @@ class GameEngine {
             document.getElementById('settings-points-multiplier').value = this.pointsMultiplier;
             document.getElementById('settings-auto-show-answer').checked = this.autoShowAnswer;
             document.getElementById('settings-auto-next-question').checked = this.autoNextQuestion;
+            document.getElementById('settings-enable-class-upgrade').checked = this.enableClassUpgrade;
             document.getElementById('settings-history-rules-text').value = this.customRulesText;
             
             document.getElementById('settings-modal').classList.add('active');
@@ -2322,6 +2339,7 @@ class GameEngine {
             this.pointsMultiplier = parseFloat(document.getElementById('settings-points-multiplier').value) || 1.0;
             this.autoShowAnswer = document.getElementById('settings-auto-show-answer').checked;
             this.autoNextQuestion = document.getElementById('settings-auto-next-question').checked;
+            this.enableClassUpgrade = document.getElementById('settings-enable-class-upgrade').checked;
             this.customRulesText = document.getElementById('settings-history-rules-text').value || "";
 
             // If turned off, clear any active auto-next countdown timer
@@ -2337,7 +2355,8 @@ class GameEngine {
             if (this.isMultiDevice && this.firebaseRef) {
                 const roomUpdates = {
                     initialHp: this.initialHp,
-                    timeoutHpPenalty: this.timeoutHpPenalty
+                    timeoutHpPenalty: this.timeoutHpPenalty,
+                    enableClassUpgrade: this.enableClassUpgrade
                 };
                 this.firebaseRef.update(roomUpdates);
 
@@ -3722,7 +3741,8 @@ class GameEngine {
                 const pointsEarned = Math.round(dmg * mult);
                 let attackerPoints = attacker.points + pointsEarned;
                 const upgradeCheck = getClassRank(attackerPoints);
-                let attackerRankIndex = upgradeCheck.rankIndex;
+                const enableUpgrade = this.latestRoomData && this.latestRoomData.enableClassUpgrade !== false;
+                let attackerRankIndex = enableUpgrade ? upgradeCheck.rankIndex : 0;
                 
                 // Update target
                 this.firebaseRef.child('players').child(targetName).update({
