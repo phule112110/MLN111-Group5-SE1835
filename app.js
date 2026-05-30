@@ -1400,6 +1400,7 @@ class GameEngine {
                 state: 'quiz',
                 currentQuestionIdx: 0,
                 questionActive: true,
+                combatPhaseActive: false,
                 timeoutHpPenalty: this.timeoutHpPenalty || 15
             });
 
@@ -2808,6 +2809,7 @@ class GameEngine {
                 state: 'quiz',
                 currentQuestionIdx: 0,
                 questionActive: true,
+                combatPhaseActive: false,
                 timeoutHpPenalty: this.timeoutHpPenalty || 15
             });
 
@@ -2938,6 +2940,7 @@ class GameEngine {
             state: 'quiz',
             currentQuestionIdx: this.activeQuestionIdx,
             questionActive: true,
+            combatPhaseActive: false,
             currentQuestion: {
                 text: q.text,
                 options: q.options
@@ -2993,6 +2996,7 @@ class GameEngine {
 
         this.firebaseRef.update({
             questionActive: false,
+            combatPhaseActive: false,
             correctAnswerIdx: q.correct,
             explanationText: q.explanation || "Luận điểm Mác - Lênin chuẩn xác."
         });
@@ -3038,34 +3042,79 @@ class GameEngine {
         document.getElementById('explanation-modal').classList.add('active');
         
         const nextBtn = document.getElementById('next-turn-btn');
-        nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
+        this.combatPhaseState = 'result';
+        let delay = 10; // 10s result viewing
+        nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
 
-        // Auto next question countdown if enabled
-        if (this.autoNextQuestion) {
-            let delay = 5; // 5 seconds
-            nextBtn.innerHTML = `Câu Hỏi Tiếp Theo (${delay}s)`;
-            if (this.autoNextTimer) clearInterval(this.autoNextTimer);
-            this.autoNextTimer = setInterval(() => {
-                delay--;
-                nextBtn.innerHTML = `Câu Hỏi Tiếp Theo (${delay}s)`;
+        if (this.autoNextTimer) clearInterval(this.autoNextTimer);
+        this.autoNextTimer = setInterval(() => {
+            delay--;
+            if (this.combatPhaseState === 'result') {
+                nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
                 if (delay <= 0) {
+                    this.combatPhaseState = 'attack';
+                    delay = 10;
+                    this.firebaseRef.update({ combatPhaseActive: true });
+                    nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+                }
+            } else if (this.combatPhaseState === 'attack') {
+                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+                if (delay <= 0) {
+                    this.combatPhaseState = 'done';
                     clearInterval(this.autoNextTimer);
                     this.autoNextTimer = null;
-                    this.handleBattleRoyaleNextStep();
+                    nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
+                    if (this.autoNextQuestion) {
+                        this.handleBattleRoyaleNextStep();
+                    }
                 }
-            }, 1000);
-        }
+            }
+        }, 1000);
     }
 
     handleBattleRoyaleNextStep() {
-        if (this.autoNextTimer) {
-            clearInterval(this.autoNextTimer);
-            this.autoNextTimer = null;
-        }
         AudioPlayer.playClick();
         if (!this.answerConfirmed) {
             this.revealBattleRoyaleExplanation();
+        } else if (this.combatPhaseState === 'result') {
+            // Skip result phase, go straight to attack phase
+            this.combatPhaseState = 'attack';
+            this.firebaseRef.update({ combatPhaseActive: true });
+            
+            if (this.autoNextTimer) clearInterval(this.autoNextTimer);
+            let delay = 10;
+            const nextBtn = document.getElementById('next-turn-btn');
+            nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+            this.autoNextTimer = setInterval(() => {
+                delay--;
+                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+                if (delay <= 0) {
+                    this.combatPhaseState = 'done';
+                    clearInterval(this.autoNextTimer);
+                    this.autoNextTimer = null;
+                    nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
+                    if (this.autoNextQuestion) {
+                        this.handleBattleRoyaleNextStep();
+                    }
+                }
+            }, 1000);
+        } else if (this.combatPhaseState === 'attack') {
+            // Skip attack phase, go to done
+            this.combatPhaseState = 'done';
+            if (this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+            }
+            document.getElementById('next-turn-btn').innerHTML = "Câu Hỏi Tiếp Theo";
+            if (this.autoNextQuestion) {
+                this.handleBattleRoyaleNextStep();
+            }
         } else {
+            // Phase is done, proceed to next question
+            if (this.autoNextTimer) {
+                clearInterval(this.autoNextTimer);
+                this.autoNextTimer = null;
+            }
             document.getElementById('explanation-modal').classList.remove('active');
             this.activeQuestionIdx++;
             
@@ -3248,7 +3297,7 @@ class GameEngine {
                     
                     // Check if they need to target first (this is active even if the question is revealed,
                     // so that players who answered correctly don't lose their right to attack!)
-                    if (myResponse && myResponse.isCorrect && !myResponse.hasAttacked) {
+                    if (myResponse && myResponse.isCorrect && !myResponse.hasAttacked && data.combatPhaseActive === true) {
                         quizView.classList.add('hidden');
                         this.showBattleRoyaleTargetingScreen(players);
                     } else if (!isQuestionActive) {
