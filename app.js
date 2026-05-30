@@ -1146,22 +1146,51 @@ class GameEngine {
                     blockText = blockText.replace(expRegex, ' ');
                 }
 
-                // C. Extract options (supports same-line and multi-line options, handles bullet/list symbols)
+                // C. Extract options and question text sequentially (guarantees perfect parsing even if option letters are glued to words)
                 const options = [];
-                const optionRegex = /(?:^|[^a-zA-Z0-9])([A-D])\s*[:.\/)\-]+\s*(.*?)(?=(?:^|[^a-zA-Z0-9])[A-D]\s*[:.\/)\-]+\s*|$)/gi;
-                const optMatches = [...blockText.matchAll(optionRegex)];
+                let questionText = blockText;
 
-                let tempBlockText = blockText;
-                optMatches.forEach(match => {
-                    const optLetter = match[1].toUpperCase();
-                    const optIndex = optLetter.charCodeAt(0) - 65;
-                    options[optIndex] = match[2].trim();
-                    tempBlockText = tempBlockText.replace(match[0], ' ');
-                });
+                const regA = /A\s*[:.\/)\-]+\s*/i;
+                const regB = /B\s*[:.\/)\-]+\s*/i;
+                const regC = /C\s*[:.\/)\-]+\s*/i;
+                const regD = /D\s*[:.\/)\-]+\s*/i;
 
-                // D. The remaining text is the question text
-                let questionText = tempBlockText.replace(/\s+/g, ' ').trim();
-                // Clean up any trailing answer letters that might have been left over
+                const matchA = blockText.match(regA);
+                if (matchA) {
+                    const idxA = matchA.index;
+                    const lenA = matchA[0].length;
+                    
+                    const subB = blockText.substring(idxA + lenA);
+                    const matchB = subB.match(regB);
+                    if (matchB) {
+                        const idxB = idxA + lenA + matchB.index;
+                        const lenB = matchB[0].length;
+                        
+                        const subC = blockText.substring(idxB + lenB);
+                        const matchC = subC.match(regC);
+                        if (matchC) {
+                            const idxC = idxB + lenB + matchC.index;
+                            const lenC = matchC[0].length;
+                            
+                            const subD = blockText.substring(idxC + lenC);
+                            const matchD = subD.match(regD);
+                            if (matchD) {
+                                const idxD = idxC + lenC + matchD.index;
+                                const lenD = matchD[0].length;
+
+                                // We have successfully found A, B, C, D in sequence!
+                                questionText = blockText.substring(0, idxA);
+                                options[0] = blockText.substring(idxA + lenA, idxB);
+                                options[1] = blockText.substring(idxB + lenB, idxC);
+                                options[2] = blockText.substring(idxC + lenC, idxD);
+                                options[3] = blockText.substring(idxD + lenD);
+                            }
+                        }
+                    }
+                }
+
+                // D. Clean up question text and options
+                questionText = questionText.replace(/\s+/g, ' ').trim();
                 questionText = questionText.replace(/\s+[A-D]$/i, '').trim();
 
                 parsedQuestions.push({
