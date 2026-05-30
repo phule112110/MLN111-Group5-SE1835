@@ -692,6 +692,8 @@ class GameEngine {
         this.timerInterval = null;
         this.autoNextTimer = null;
         this.timeLeft = 0;
+        this.phaseRemaining = 0;
+        this.isPaused = false;
         this.selectedOptionIdx = null;
         this.answerConfirmed = false;
         this.currentResponses = {};
@@ -854,9 +856,12 @@ class GameEngine {
             // Reset state to lobby so anyone remaining knows
             this.firebaseRef.update({
                 state: 'lobby',
-                questionActive: false
+                questionActive: false,
+                isPaused: false,
+                pausedPhaseTimeLeft: null
             });
         }
+        this.isPaused = false;
         
         // Hide all screens, show Setup
         document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -1407,6 +1412,8 @@ class GameEngine {
                 currentQuestionIdx: 0,
                 questionActive: true,
                 combatPhaseActive: false,
+                isPaused: false,
+                pausedPhaseTimeLeft: null,
                 timeoutHpPenalty: this.timeoutHpPenalty || 15
             });
 
@@ -2169,6 +2176,8 @@ class GameEngine {
                     state: 'lobby',
                     currentQuestionIdx: 0,
                     questionActive: false,
+                    isPaused: false,
+                    pausedPhaseTimeLeft: null,
                     players: {},
                     timeoutHpPenalty: this.timeoutHpPenalty || 15,
                     battleLogs: [`[HỆ THỐNG] Đấu trường sinh tồn 40 người chơi đã sẵn sàng!`]
@@ -2354,6 +2363,14 @@ class GameEngine {
                 this.returnToSetup();
             }
         });
+
+        // Host pause button
+        const hostPauseBtn = document.getElementById('host-pause-btn');
+        if (hostPauseBtn) {
+            hostPauseBtn.addEventListener('click', () => {
+                this.togglePause();
+            });
+        }
 
         // Host header auto-next status toggle
         document.getElementById('host-toggle-auto-next').addEventListener('click', () => {
@@ -2991,6 +3008,7 @@ class GameEngine {
         if (this.timerInterval) clearInterval(this.timerInterval);
 
         this.timeLeft = this.questionTime;
+        this.phaseRemaining = this.questionTime;
         const timerBar = document.getElementById('timer-bar');
         const timerText = document.getElementById('timer-text');
 
@@ -3005,7 +3023,9 @@ class GameEngine {
         });
 
         this.timerInterval = setInterval(() => {
-            this.timeLeft--;
+            if (this.isPaused) return;
+            this.phaseRemaining--;
+            this.timeLeft = this.phaseRemaining;
             timerText.innerText = `${this.timeLeft}s`;
             timerBar.style.width = `${(this.timeLeft / this.questionTime) * 100}%`;
 
@@ -3084,35 +3104,36 @@ class GameEngine {
         
         const nextBtn = document.getElementById('next-turn-btn');
         this.combatPhaseState = 'result';
-        let delay = 10; // 10s result viewing
-        const endTime = Date.now() + delay * 1000;
+        this.phaseRemaining = 10; // 10s result viewing
+        const endTime = Date.now() + this.phaseRemaining * 1000;
         this.firebaseRef.update({
             phaseEndTime: endTime,
-            phaseTotalTime: delay,
+            phaseTotalTime: 10,
             currentPhaseLabel: "XEM KẾT QUẢ"
         });
-        nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
+        nextBtn.innerHTML = `Chuẩn bị Tấn Công (${this.phaseRemaining}s)`;
 
         if (this.autoNextTimer) clearInterval(this.autoNextTimer);
         this.autoNextTimer = setInterval(() => {
-            delay--;
+            if (this.isPaused) return;
+            this.phaseRemaining--;
             if (this.combatPhaseState === 'result') {
-                nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                nextBtn.innerHTML = `Chuẩn bị Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'attack';
-                    delay = 10;
-                    const attackEndTime = Date.now() + delay * 1000;
+                    this.phaseRemaining = 10;
+                    const attackEndTime = Date.now() + this.phaseRemaining * 1000;
                     this.firebaseRef.update({ 
                         combatPhaseActive: true,
                         phaseEndTime: attackEndTime,
-                        phaseTotalTime: delay,
+                        phaseTotalTime: 10,
                         currentPhaseLabel: "TẤN CÔNG"
                     });
-                    nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+                    nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
                 }
             } else if (this.combatPhaseState === 'attack') {
-                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'done';
                     this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
@@ -3126,6 +3147,31 @@ class GameEngine {
         }, 1000);
     }
 
+    togglePause() {
+        if (!this.firebaseRef || this.state === 'setup' || this.state === 'lobby' || this.state === 'ended') return;
+        this.isPaused = !this.isPaused;
+        AudioPlayer.playClick();
+        
+        const dot = document.getElementById('pause-indicator-dot');
+        const text = document.getElementById('pause-indicator-text');
+        
+        if (this.isPaused) {
+            if (dot) dot.style.background = '#f59e0b';
+            if (text) text.innerText = 'TIẾP TỤC';
+            this.firebaseRef.update({
+                isPaused: true,
+                pausedPhaseTimeLeft: this.phaseRemaining
+            });
+        } else {
+            if (dot) dot.style.background = '#10b981';
+            if (text) text.innerText = 'TẠM DỪNG';
+            this.firebaseRef.update({
+                isPaused: false,
+                phaseEndTime: Date.now() + this.phaseRemaining * 1000
+            });
+        }
+    }
+
     handleBattleRoyaleNextStep() {
         AudioPlayer.playClick();
         if (!this.answerConfirmed) {
@@ -3133,22 +3179,23 @@ class GameEngine {
         } else if (this.combatPhaseState === 'result') {
             // Skip result phase, go straight to attack phase
             this.combatPhaseState = 'attack';
-            let delay = 10;
-            const attackEndTime = Date.now() + delay * 1000;
+            this.phaseRemaining = 10;
+            const attackEndTime = Date.now() + this.phaseRemaining * 1000;
             this.firebaseRef.update({ 
                 combatPhaseActive: true,
                 phaseEndTime: attackEndTime,
-                phaseTotalTime: delay,
+                phaseTotalTime: 10,
                 currentPhaseLabel: "TẤN CÔNG"
             });
             
             if (this.autoNextTimer) clearInterval(this.autoNextTimer);
             const nextBtn = document.getElementById('next-turn-btn');
-            nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
+            nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
             this.autoNextTimer = setInterval(() => {
-                delay--;
-                nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
-                if (delay <= 0) {
+                if (this.isPaused) return;
+                this.phaseRemaining--;
+                nextBtn.innerHTML = `Thời gian Tấn Công (${this.phaseRemaining}s)`;
+                if (this.phaseRemaining <= 0) {
                     this.combatPhaseState = 'done';
                     this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
@@ -3322,6 +3369,16 @@ class GameEngine {
             const data = snapshot.val();
             if (!data) return;
             this.latestRoomData = data;
+
+            // Handle pause overlay
+            const pauseOverlay = document.getElementById('client-pause-overlay');
+            if (pauseOverlay) {
+                if (data.isPaused) {
+                    pauseOverlay.classList.remove('hidden');
+                } else {
+                    pauseOverlay.classList.add('hidden');
+                }
+            }
 
             const myTeamName = this.clientTeamName;
             const players = data.players || {};
@@ -3709,7 +3766,12 @@ class GameEngine {
             }
             if (container) container.classList.remove('hidden');
             
-            const remaining = Math.max(0, this.latestRoomData.phaseEndTime - Date.now());
+            let remaining = 0;
+            if (this.latestRoomData.isPaused && this.latestRoomData.pausedPhaseTimeLeft !== undefined) {
+                remaining = this.latestRoomData.pausedPhaseTimeLeft * 1000;
+            } else {
+                remaining = Math.max(0, this.latestRoomData.phaseEndTime - Date.now());
+            }
             const total = this.latestRoomData.phaseTotalTime * 1000;
             const pct = total > 0 ? (remaining / total) * 100 : 0;
             
