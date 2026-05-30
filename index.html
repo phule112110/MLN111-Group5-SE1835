@@ -144,13 +144,8 @@
                                 <div class="round-badge">VÒNG <span id="current-round">1</span></div>
                                 <div class="turn-indicator">Lượt trả lời: <span id="active-team-name" class="active-team-text">Nhóm 1</span></div>
                             </div>
-                            <div style="display: flex; gap: 10px; align-items: center;">
-                                <button id="host-pause-btn" class="control-btn" style="padding: 6px 12px; font-size: 10px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); color: #fff; cursor: pointer; width: auto !important; height: auto !important; white-space: nowrap;" title="Tạm dừng / Tiếp tục">
-                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #10b981;" id="pause-indicator-dot"></span>
-                                    <span id="pause-indicator-text">TẠM DỪNG</span>
-                                </button>
-                                <button id="host-toggle-auto-next" class="control-btn" style="padding: 6px 12px; font-size: 10px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); color: #fff; cursor: pointer; width: auto !important; height: auto !important; white-space: nowrap;" title="Bật/Tắt Tự động chuyển câu">
-                                    <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;" id="auto-next-indicator-dot"></span>
+                            <button id="host-toggle-auto-next" class="control-btn" style="padding: 6px 12px; font-size: 10px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 700; border: 1px solid rgba(255,255,255,0.1); border-radius: 6px; display: flex; align-items: center; gap: 6px; background: rgba(0,0,0,0.3); color: #fff; cursor: pointer; width: auto !important; height: auto !important; white-space: nowrap;" title="Bật/Tắt Tự động chuyển câu">
+                                <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #ef4444;" id="auto-next-indicator-dot"></span>
                                 <span id="auto-next-indicator-text">TỰ ĐỘNG QUA: TẮT</span>
                             </button>
                         </div>
@@ -408,13 +403,6 @@
                 </div>
                 <button id="client-btn-back-to-choice" class="action-btn tertiary-btn small-btn" style="align-self: flex-start; margin-top: 5px; font-size: 11px;">← Quay lại</button>
             </div>
-        </div>
-
-        <!-- CLIENT PAUSE OVERLAY -->
-        <div id="client-pause-overlay" class="hidden" style="position: absolute; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; border-radius: 10px; backdrop-filter: blur(5px);">
-            <div class="pulse-ring" style="width: 50px; height: 50px; border-color: var(--neon-gold); margin-bottom: 20px;"></div>
-            <h2 class="glowing-text gold-glow" style="font-size: 20px; font-family: 'Plus Jakarta Sans', sans-serif; font-weight: 800; letter-spacing: 1px;">TẠM DỪNG</h2>
-            <p style="color: #fff; font-size: 13px; text-align: center; margin-top: 10px; padding: 0 20px;">Trận đấu đang được tạm dừng bởi Host.<br>Vui lòng chờ giây lát...</p>
         </div>
 
         <!-- VIEW 5: SPECTATOR / WAIT VIEW -->
