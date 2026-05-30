@@ -1130,7 +1130,7 @@ class GameEngine {
 
                 // A. Extract correct answer
                 let correct = null;
-                const ansRegex = /(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i;
+                const ansRegex = /(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|(?=[A-Z])|(?=giải\s*thích|lời\s*giải|lý\s*giải|explanation|key|$))/i;
                 const ansMatch = blockText.match(ansRegex);
                 if (ansMatch) {
                     correct = ansMatch[1].toUpperCase().charCodeAt(0) - 65;
@@ -1227,7 +1227,7 @@ class GameEngine {
                     continue;
                 }
 
-                const ansMatch = line.match(/^\s*(?:[\-*•]\s*)?(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|$)/i);
+                const ansMatch = line.match(/^\s*(?:[\-*•]\s*)?(?:Đáp án đúng|Đáp án|ĐA|Key|Chọn|Chọn đáp án đúng|Đúng|Đáp án đúng là|ĐA đúng)\s*(?:là)?\s*[:\-\s]*([A-D])(?:\.|\s|(?=[A-Z])|(?=giải\s*thích|lời\s*giải|lý\s*giải|explanation|key|$))/i);
                 if (ansMatch && currentQuestion) {
                     const correctLetter = ansMatch[1].toUpperCase();
                     currentQuestion.correct = correctLetter.charCodeAt(0) - 65;
