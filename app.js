@@ -723,6 +723,12 @@ class GameEngine {
             return;
         }
 
+        // Force reset multi-device checkbox to prevent browser cache from silently checking it
+        const multiDeviceCheckbox = document.getElementById('enable-multi-device');
+        if (multiDeviceCheckbox) {
+            multiDeviceCheckbox.checked = false;
+        }
+
         this.setupEventListeners();
         this.renderSetupTeams();
         this.applyCustomRulesText();
