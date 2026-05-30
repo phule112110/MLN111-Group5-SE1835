@@ -1115,7 +1115,7 @@ class GameEngine {
 
         // 1. First, check if the document contains structured question headers
         // Optional leading bullet, optional Câu/Question/Q, digits, and a punctuation separator
-        const qHeaderRegex = /(?:^|\s+)(?:[\-*•]\s*)?(?:Câu|Question|Q)?\s*(\d+)[:.\/\-]+\s*/gi;
+        const qHeaderRegex = /(?:(?:Câu|Question|Q)\s*(\d+)|(?:\b|[\s\ufeff\.,;?!\-\)])(\d+))(?:[:\/\-]+|(?:\.\s+))\s*/gi;
         const matches = [...rawText.matchAll(qHeaderRegex)];
 
         if (matches.length > 0) {
@@ -1249,7 +1249,11 @@ class GameEngine {
 
         parsedQuestions.forEach((q, idx) => {
             const hasText = q.text && q.text.trim() !== '';
-            const has4Options = q.options && q.options.length === 4 && q.options.every(opt => opt && opt.trim() !== '');
+            const has4Options = q.options && q.options.length === 4 &&
+                                q.options[0] !== undefined && q.options[0] !== null && q.options[0].trim() !== '' &&
+                                q.options[1] !== undefined && q.options[1] !== null && q.options[1].trim() !== '' &&
+                                q.options[2] !== undefined && q.options[2] !== null && q.options[2].trim() !== '' &&
+                                q.options[3] !== undefined && q.options[3] !== null && q.options[3].trim() !== '';
             const hasCorrect = q.correct !== null && q.correct >= 0 && q.correct <= 3;
 
             if (hasText && has4Options && hasCorrect) {
