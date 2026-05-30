@@ -323,6 +323,17 @@
             </div>
         </div>
 
+        <!-- CLIENT PHASE TIMER BAR -->
+        <div id="client-phase-timer-container" class="hidden" style="margin-bottom: 15px; text-align: left; background: rgba(0,0,0,0.4); padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05);">
+            <div style="display: flex; justify-content: space-between; font-size: 10px; font-weight: bold; color: var(--text-muted); margin-bottom: 5px; font-family: 'Orbitron', sans-serif;">
+                <span id="client-phase-timer-label">THỜI GIAN TRẢ LỜI</span>
+                <span id="client-phase-timer-text">--s</span>
+            </div>
+            <div style="height: 6px; background: rgba(255,255,255,0.1); border-radius: 3px; overflow: hidden; width: 100%;">
+                <div id="client-phase-timer-bar" style="width: 100%; height: 100%; background: linear-gradient(90deg, hsl(var(--neon-cyan)), hsl(var(--neon-gold))); transition: width 0.05s linear;"></div>
+            </div>
+        </div>
+
         <!-- VIEW 1: JOIN ROOM & CHOOSE TEAM -->
         <div id="client-setup-view" class="flex-col" style="gap: 15px;">
             <p style="font-size: 13px; color: var(--text-muted);">Bạn đang kết nối đến Phòng Đấu: <strong id="client-room-display" style="color: var(--neon-gold); font-size: 16px; font-family: 'Orbitron', sans-serif;">----</strong></p>

@@ -2991,6 +2991,13 @@ class GameEngine {
         timerBar.style.width = '100%';
         timerText.innerText = `${this.timeLeft}s`;
 
+        const endTime = Date.now() + this.timeLeft * 1000;
+        this.firebaseRef.update({
+            phaseEndTime: endTime,
+            phaseTotalTime: this.timeLeft,
+            currentPhaseLabel: "THỜI GIAN TRẢ LỜI"
+        });
+
         this.timerInterval = setInterval(() => {
             this.timeLeft--;
             timerText.innerText = `${this.timeLeft}s`;
@@ -3072,6 +3079,12 @@ class GameEngine {
         const nextBtn = document.getElementById('next-turn-btn');
         this.combatPhaseState = 'result';
         let delay = 10; // 10s result viewing
+        const endTime = Date.now() + delay * 1000;
+        this.firebaseRef.update({
+            phaseEndTime: endTime,
+            phaseTotalTime: delay,
+            currentPhaseLabel: "XEM KẾT QUẢ"
+        });
         nextBtn.innerHTML = `Chuẩn bị Tấn Công (${delay}s)`;
 
         if (this.autoNextTimer) clearInterval(this.autoNextTimer);
@@ -3082,13 +3095,20 @@ class GameEngine {
                 if (delay <= 0) {
                     this.combatPhaseState = 'attack';
                     delay = 10;
-                    this.firebaseRef.update({ combatPhaseActive: true });
+                    const attackEndTime = Date.now() + delay * 1000;
+                    this.firebaseRef.update({ 
+                        combatPhaseActive: true,
+                        phaseEndTime: attackEndTime,
+                        phaseTotalTime: delay,
+                        currentPhaseLabel: "TẤN CÔNG"
+                    });
                     nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
                 }
             } else if (this.combatPhaseState === 'attack') {
                 nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
                 if (delay <= 0) {
                     this.combatPhaseState = 'done';
+                    this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
                     this.autoNextTimer = null;
                     nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
@@ -3107,10 +3127,16 @@ class GameEngine {
         } else if (this.combatPhaseState === 'result') {
             // Skip result phase, go straight to attack phase
             this.combatPhaseState = 'attack';
-            this.firebaseRef.update({ combatPhaseActive: true });
+            let delay = 10;
+            const attackEndTime = Date.now() + delay * 1000;
+            this.firebaseRef.update({ 
+                combatPhaseActive: true,
+                phaseEndTime: attackEndTime,
+                phaseTotalTime: delay,
+                currentPhaseLabel: "TẤN CÔNG"
+            });
             
             if (this.autoNextTimer) clearInterval(this.autoNextTimer);
-            let delay = 10;
             const nextBtn = document.getElementById('next-turn-btn');
             nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
             this.autoNextTimer = setInterval(() => {
@@ -3118,6 +3144,7 @@ class GameEngine {
                 nextBtn.innerHTML = `Thời gian Tấn Công (${delay}s)`;
                 if (delay <= 0) {
                     this.combatPhaseState = 'done';
+                    this.firebaseRef.update({ currentPhaseLabel: "" });
                     clearInterval(this.autoNextTimer);
                     this.autoNextTimer = null;
                     nextBtn.innerHTML = "Câu Hỏi Tiếp Theo";
@@ -3129,6 +3156,7 @@ class GameEngine {
         } else if (this.combatPhaseState === 'attack') {
             // Skip attack phase, go to done
             this.combatPhaseState = 'done';
+            this.firebaseRef.update({ currentPhaseLabel: "" });
             if (this.autoNextTimer) {
                 clearInterval(this.autoNextTimer);
                 this.autoNextTimer = null;
@@ -3283,9 +3311,11 @@ class GameEngine {
     }
 
     setupClientSync() {
+        this.startClientPhaseTimerSync();
         this.firebaseRef.on('value', (snapshot) => {
             const data = snapshot.val();
             if (!data) return;
+            this.latestRoomData = data;
 
             const myTeamName = this.clientTeamName;
             const players = data.players || {};
@@ -3661,6 +3691,37 @@ class GameEngine {
                 document.getElementById('client-wait-msg').innerText = "Đã nộp câu trả lời & công kích thành công! Đang chờ câu hỏi tiếp theo...";
             }
         });
+    }
+
+    startClientPhaseTimerSync() {
+        if (this.clientTimerSyncInterval) return;
+        this.clientTimerSyncInterval = setInterval(() => {
+            const container = document.getElementById('client-phase-timer-container');
+            if (!this.latestRoomData || !this.latestRoomData.currentPhaseLabel || !this.latestRoomData.phaseEndTime) {
+                if (container) container.classList.add('hidden');
+                return;
+            }
+            if (container) container.classList.remove('hidden');
+            
+            const remaining = Math.max(0, this.latestRoomData.phaseEndTime - Date.now());
+            const total = this.latestRoomData.phaseTotalTime * 1000;
+            const pct = total > 0 ? (remaining / total) * 100 : 0;
+            
+            document.getElementById('client-phase-timer-label').innerText = this.latestRoomData.currentPhaseLabel;
+            document.getElementById('client-phase-timer-text').innerText = Math.ceil(remaining / 1000) + 's';
+            
+            const bar = document.getElementById('client-phase-timer-bar');
+            bar.style.width = pct + '%';
+            
+            // Color changing based on phase
+            if (this.latestRoomData.currentPhaseLabel === 'TẤN CÔNG') {
+                bar.style.background = 'linear-gradient(90deg, #ef4444, #f97316)';
+            } else if (this.latestRoomData.currentPhaseLabel === 'XEM KẾT QUẢ') {
+                bar.style.background = 'linear-gradient(90deg, #10b981, #3b82f6)';
+            } else {
+                bar.style.background = 'linear-gradient(90deg, hsl(var(--neon-cyan)), hsl(var(--neon-gold)))';
+            }
+        }, 50);
     }
 
     renderClientLeaderboard(players) {
